@@ -8,25 +8,25 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.everyWear.everyWear.DAO.CouponDAO;
+import com.everyWear.everyWear.DAO.PromotionDAO;
 import com.everyWear.everyWear.dto.coupon.CouponRequest;
 import com.everyWear.everyWear.dto.coupon.CouponResponse;
 import com.everyWear.everyWear.exception.BadRequestException;
 import com.everyWear.everyWear.exception.ResourceNotFoundException;
 import com.everyWear.everyWear.model.Coupon;
 import com.everyWear.everyWear.model.Promotion;
-import com.everyWear.everyWear.repository.CouponRepository;
-import com.everyWear.everyWear.repository.PromotionRepository;
 
 @Service
 @Transactional
 public class CouponService {
 
-	private final CouponRepository couponRepository;
-	private final PromotionRepository promotionRepository;
+	private final CouponDAO couponDAO;
+	private final PromotionDAO promotionDAO;
 
-	public CouponService(CouponRepository couponRepository, PromotionRepository promotionRepository) {
-		this.couponRepository = couponRepository;
-		this.promotionRepository = promotionRepository;
+	public CouponService(CouponDAO couponDAO, PromotionDAO promotionDAO) {
+		this.couponDAO = couponDAO;
+		this.promotionDAO = promotionDAO;
 	}
 
 	public CouponResponse createCoupon(CouponRequest request) {
@@ -37,12 +37,12 @@ public class CouponService {
 		applyRequestToCoupon(coupon, request, promotion);
 		coupon.setCreatedAt(new Date());
 
-		return toResponse(couponRepository.save(coupon));
+		return toResponse(couponDAO.save(coupon));
 	}
 
 	@Transactional(readOnly = true)
 	public List<CouponResponse> getAllCoupons() {
-		return couponRepository.findAll()
+		return couponDAO.findAll()
 				.stream()
 				.map(this::toResponse)
 				.toList();
@@ -60,12 +60,12 @@ public class CouponService {
 		Promotion promotion = getPromotionById(request.getPromotionId());
 		applyRequestToCoupon(coupon, request, promotion);
 
-		return toResponse(couponRepository.save(coupon));
+		return toResponse(couponDAO.save(coupon));
 	}
 
 	public void deleteCoupon(Integer id) {
 		Coupon coupon = getCouponEntityById(id);
-		couponRepository.delete(coupon);
+		couponDAO.delete(coupon);
 	}
 
 	private void applyRequestToCoupon(Coupon coupon, CouponRequest request, Promotion promotion) {
@@ -76,20 +76,20 @@ public class CouponService {
 	}
 
 	private Coupon getCouponEntityById(Integer id) {
-		return couponRepository.findById(id)
+		return couponDAO.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Coupon with id " + id + " was not found"));
 	}
 
 	private Promotion getPromotionById(Integer id) {
-		return promotionRepository.findById(id)
+		return promotionDAO.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Promotion with id " + id + " was not found"));
 	}
 
 	private void validateUniqueCode(String code, Integer couponId) {
 		String normalizedCode = code.trim();
 		boolean exists = couponId == null
-				? couponRepository.existsByCode(normalizedCode)
-				: couponRepository.existsByCodeAndIdNot(normalizedCode, couponId);
+				? couponDAO.existsByCode(normalizedCode)
+				: couponDAO.existsByCodeAndIdNot(normalizedCode, couponId);
 
 		if (exists) {
 			throw new BadRequestException("Coupon code already exists");
