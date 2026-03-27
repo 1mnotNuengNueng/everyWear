@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generated Mar 27, 2026, 6:53:32 PM by Hibernate Tools 5.5.9.Final --><!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+    <class name="model.Orders" optimistic-lock="none" table="orders">
+        <id name="id" type="java.lang.Integer">
+            <column name="id"/>
+            <generator class="identity"/>
+        </id>
+        <many-to-one class="model.Coupon" fetch="select" name="coupon">
+            <column name="coupon_id"/>
+        </many-to-one>
+        <property name="orderDate" type="timestamp">
+            <column length="19" name="order_date" not-null="true"/>
+        </property>
+        <property name="discountAmount" type="big_decimal">
+            <column name="discount_amount" precision="10"/>
+        </property>
+        <property name="totalPrice" type="big_decimal">
+            <column name="total_price" not-null="true" precision="10"/>
+        </property>
+        <property name="netValue" type="big_decimal">
+            <column name="net_value" not-null="true" precision="10"/>
+        </property>
+        <property name="createdAt" type="timestamp">
+            <column length="19" name="created_at" not-null="true"/>
+        </property>
+        <set fetch="select" inverse="true" lazy="true" name="orderDetails" table="order_detail">
+            <key>
+                <column name="order_id" not-null="true"/>
+            </key>
+            <one-to-many class="model.OrderDetail"/>
+        </set>
+    </class>
+</hibernate-mapping>
