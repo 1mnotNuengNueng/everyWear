@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { apiGetJson } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+
 type OrderSummary = {
   id: number;
   orderDate: string | null;
@@ -45,12 +47,20 @@ export default async function OrdersPage() {
               เลือกออเดอร์เพื่อดูรายละเอียดสินค้าและยอดรวม
             </p>
           </div>
-          <Link
-            href="/"
-            className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500 dark:text-zinc-50"
-          >
-            กลับหน้าแรก
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/orders/new"
+              className="h-10 inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-white"
+            >
+              สร้างออเดอร์
+            </Link>
+            <Link
+              href="/"
+              className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500 dark:text-zinc-50"
+            >
+              กลับหน้าแรก
+            </Link>
+          </div>
         </div>
 
         <div className="mt-8 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
@@ -99,4 +109,3 @@ export default async function OrdersPage() {
     </div>
   );
 }
-

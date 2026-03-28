@@ -14,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
@@ -123,7 +124,7 @@ public class Orders implements java.io.Serializable {
 		this.createdAt = createdAt;
 	}
 
-	@OneToMany(mappedBy = "orders", fetch = FetchType.LAZY)
+	@OneToMany(mappedBy = "orders", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
 	public Set<OrderDetail> getOrderDetails() {
 		return this.orderDetails;
 	}

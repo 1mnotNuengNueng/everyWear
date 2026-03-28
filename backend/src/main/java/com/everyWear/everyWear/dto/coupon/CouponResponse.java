@@ -2,6 +2,7 @@ package com.everyWear.everyWear.dto.coupon;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class CouponResponse {
 
@@ -13,6 +14,7 @@ public class CouponResponse {
 	private Integer promotionId;
 	private String promotionName;
 	private BigDecimal discountValue;
+	private List<Integer> allowedCategoryIds;
 
 	public Integer getId() {
 		return id;
@@ -76,5 +78,13 @@ public class CouponResponse {
 
 	public void setDiscountValue(BigDecimal discountValue) {
 		this.discountValue = discountValue;
+	}
+
+	public List<Integer> getAllowedCategoryIds() {
+		return allowedCategoryIds;
+	}
+
+	public void setAllowedCategoryIds(List<Integer> allowedCategoryIds) {
+		this.allowedCategoryIds = allowedCategoryIds;
 	}
 }

@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import com.everyWear.everyWear.exception.BadRequestException;
 import com.everyWear.everyWear.exception.ResourceNotFoundException;
 import com.everyWear.everyWear.model.Coupon;
 import com.everyWear.everyWear.model.Promotion;
+import com.everyWear.everyWear.model.PromotionCategory;
 
 @Service
 @Transactional
@@ -106,6 +108,19 @@ public class CouponService {
 		response.setPromotionId(coupon.getPromotion().getId());
 		response.setPromotionName(coupon.getPromotion().getName());
 		response.setDiscountValue(coupon.getPromotion().getDiscountValue());
+
+		Set<PromotionCategory> promotionCategories = coupon.getPromotion().getPromotionCategories();
+		if (promotionCategories != null && !promotionCategories.isEmpty()) {
+			List<Integer> allowedCategoryIds = promotionCategories.stream()
+					.map(pc -> pc.getCategory() == null ? null : pc.getCategory().getId())
+					.filter(id -> id != null)
+					.distinct()
+					.toList();
+			if (!allowedCategoryIds.isEmpty()) {
+				response.setAllowedCategoryIds(allowedCategoryIds);
+			}
+		}
+
 		return response;
 	}
 

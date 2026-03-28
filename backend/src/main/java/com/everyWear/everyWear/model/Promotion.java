@@ -8,9 +8,11 @@ import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
@@ -53,8 +55,8 @@ public class Promotion implements Serializable {
 	@Transient
 	private Set<?> coupons = new HashSet<>(0);
 
-	@Transient
-	private Set<?> promotionCategories = new HashSet<>(0);
+	@OneToMany(mappedBy = "promotion", fetch = FetchType.LAZY)
+	private Set<PromotionCategory> promotionCategories = new HashSet<>(0);
 
 	public Promotion() {
 	}
@@ -70,7 +72,7 @@ public class Promotion implements Serializable {
 	}
 
 	public Promotion(String name, String description, BigDecimal discountValue, Date startAt, Date endAt,
-			boolean isActive, Date createdAt, Set<?> coupons, Set<?> promotionCategories) {
+			boolean isActive, Date createdAt, Set<?> coupons, Set<PromotionCategory> promotionCategories) {
 		this.name = name;
 		this.description = description;
 		this.discountValue = discountValue;
@@ -154,11 +156,11 @@ public class Promotion implements Serializable {
 		this.coupons = coupons;
 	}
 
-	public Set<?> getPromotionCategories() {
+	public Set<PromotionCategory> getPromotionCategories() {
 		return this.promotionCategories;
 	}
 
-	public void setPromotionCategories(Set<?> promotionCategories) {
+	public void setPromotionCategories(Set<PromotionCategory> promotionCategories) {
 		this.promotionCategories = promotionCategories;
 	}
 }

@@ -8,6 +8,8 @@ import java.util.List;
 public class OrderDetailResponse {
 
 	private Integer id;
+	private Integer couponId;
+	private String couponCode;
 	private LocalDateTime orderDate;
 	private LocalDateTime createdAt;
 	private BigDecimal totalPrice;
@@ -21,6 +23,22 @@ public class OrderDetailResponse {
 
 	public void setId(Integer id) {
 		this.id = id;
+	}
+
+	public Integer getCouponId() {
+		return couponId;
+	}
+
+	public void setCouponId(Integer couponId) {
+		this.couponId = couponId;
+	}
+
+	public String getCouponCode() {
+		return couponCode;
+	}
+
+	public void setCouponCode(String couponCode) {
+		this.couponCode = couponCode;
 	}
 
 	public LocalDateTime getOrderDate() {
@@ -71,4 +89,3 @@ public class OrderDetailResponse {
 		this.items = items;
 	}
 }
-
