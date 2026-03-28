@@ -59,6 +59,5 @@ export async function updateOrderAction(orderId: number, formData: FormData) {
 
 export async function deleteOrderAction(orderId: number) {
   await backendJsonRequest<void>(`/api/orders/${orderId}`, { method: "DELETE" });
-  redirect("/orders");
+  redirect(`/orders/${orderId}`);
 }
-

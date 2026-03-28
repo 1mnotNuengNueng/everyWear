@@ -8,6 +8,7 @@ import java.util.List;
 public class OrderDetailResponse {
 
 	private Integer id;
+	private String status;
 	private Integer couponId;
 	private String couponCode;
 	private LocalDateTime orderDate;
@@ -23,6 +24,14 @@ public class OrderDetailResponse {
 
 	public void setId(Integer id) {
 		this.id = id;
+	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
 	}
 
 	public Integer getCouponId() {

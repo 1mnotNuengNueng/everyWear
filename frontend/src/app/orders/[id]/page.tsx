@@ -16,6 +16,7 @@ type OrderItem = {
 
 type OrderDetail = {
   id: number;
+  status: string;
   couponId: number | null;
   couponCode: string | null;
   orderDate: string | null;
@@ -68,9 +69,16 @@ export default async function OrderDetailPage({
       <main className="w-full max-w-5xl flex-1 mx-auto px-6 py-10">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-              รายละเอียดออเดอร์ #{order.id}
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                รายละเอียดออเดอร์ #{order.id}
+              </h1>
+              {order.status === "CANCELLED" ? (
+                <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-200">
+                  CANCELLED
+                </span>
+              ) : null}
+            </div>
             <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
               <div>วันที่สั่งซื้อ: {formatDateTime(order.orderDate)}</div>
               <div>สร้างเมื่อ: {formatDateTime(order.createdAt)}</div>
@@ -87,18 +95,21 @@ export default async function OrderDetailPage({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href={`/orders/${order.id}/edit`}
-              className="h-10 inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900/40"
-            >
-              แก้ไข
-            </Link>
+            {order.status !== "CANCELLED" ? (
+              <Link
+                href={`/orders/${order.id}/edit`}
+                className="h-10 inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900/40"
+              >
+                แก้ไข
+              </Link>
+            ) : null}
             <form action={deleteOrderAction.bind(null, order.id)}>
               <button
                 type="submit"
-                className="h-10 inline-flex items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700"
+                className="h-10 inline-flex items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={order.status === "CANCELLED"}
               >
-                ลบ
+                ยกเลิกออเดอร์
               </button>
             </form>
             <Link
