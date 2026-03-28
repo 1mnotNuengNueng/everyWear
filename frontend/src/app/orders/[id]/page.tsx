@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { apiGet } from "@/lib/api";
+import { deleteOrderAction } from "../actions";
+
+export const dynamic = "force-dynamic";
 
 type OrderItem = {
   itemId: number | null;
@@ -13,6 +16,8 @@ type OrderItem = {
 
 type OrderDetail = {
   id: number;
+  couponId: number | null;
+  couponCode: string | null;
   orderDate: string | null;
   createdAt: string | null;
   totalPrice: string | number | null;
@@ -69,14 +74,40 @@ export default async function OrderDetailPage({
             <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
               <div>วันที่สั่งซื้อ: {formatDateTime(order.orderDate)}</div>
               <div>สร้างเมื่อ: {formatDateTime(order.createdAt)}</div>
+              <div>
+                คูปอง:{" "}
+                {order.couponCode ? (
+                  <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {order.couponCode}
+                  </span>
+                ) : (
+                  "-"
+                )}
+              </div>
             </div>
           </div>
-          <Link
-            href="/orders"
-            className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500 dark:text-zinc-50"
-          >
-            กลับไปหน้าออเดอร์
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/orders/${order.id}/edit`}
+              className="h-10 inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900/40"
+            >
+              แก้ไข
+            </Link>
+            <form action={deleteOrderAction.bind(null, order.id)}>
+              <button
+                type="submit"
+                className="h-10 inline-flex items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700"
+              >
+                ลบ
+              </button>
+            </form>
+            <Link
+              href="/orders"
+              className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500 dark:text-zinc-50"
+            >
+              กลับไปหน้าออเดอร์
+            </Link>
+          </div>
         </div>
 
         <div className="mt-8 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
@@ -150,4 +181,3 @@ export default async function OrderDetailPage({
     </div>
   );
 }
-

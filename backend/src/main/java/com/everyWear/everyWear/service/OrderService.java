@@ -1,30 +1,45 @@
 package com.everyWear.everyWear.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.everyWear.everyWear.DAO.CouponDAO;
+import com.everyWear.everyWear.DAO.ItemDAO;
 import com.everyWear.everyWear.DAO.OrdersDAO;
 import com.everyWear.everyWear.dto.order.OrderDetailResponse;
 import com.everyWear.everyWear.dto.order.OrderItemResponse;
+import com.everyWear.everyWear.dto.order.OrderItemRequest;
 import com.everyWear.everyWear.dto.order.OrderSummaryResponse;
+import com.everyWear.everyWear.dto.order.OrderUpsertRequest;
+import com.everyWear.everyWear.exception.BadRequestException;
 import com.everyWear.everyWear.exception.ResourceNotFoundException;
+import com.everyWear.everyWear.model.Coupon;
 import com.everyWear.everyWear.model.OrderDetail;
+import com.everyWear.everyWear.model.Item;
 import com.everyWear.everyWear.model.Orders;
+import com.everyWear.everyWear.model.PromotionCategory;
 
 @Service
 @Transactional
 public class OrderService {
 
 	private final OrdersDAO ordersDAO;
+	private final ItemDAO itemDAO;
+	private final CouponDAO couponDAO;
 
-	public OrderService(OrdersDAO ordersDAO) {
+	public OrderService(OrdersDAO ordersDAO, ItemDAO itemDAO, CouponDAO couponDAO) {
 		this.ordersDAO = ordersDAO;
+		this.itemDAO = itemDAO;
+		this.couponDAO = couponDAO;
 	}
 
 	@Transactional(readOnly = true)
@@ -42,6 +57,25 @@ public class OrderService {
 		return toDetailResponse(orders);
 	}
 
+	public OrderDetailResponse createOrder(OrderUpsertRequest request) {
+		Orders orders = new Orders();
+		applyUpsertRequest(orders, request, true);
+		return toDetailResponse(ordersDAO.save(orders));
+	}
+
+	public OrderDetailResponse updateOrder(Integer id, OrderUpsertRequest request) {
+		Orders orders = ordersDAO.findByIdWithDetails(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " was not found"));
+		applyUpsertRequest(orders, request, false);
+		return toDetailResponse(ordersDAO.save(orders));
+	}
+
+	public void deleteOrder(Integer id) {
+		Orders orders = ordersDAO.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " was not found"));
+		ordersDAO.delete(orders);
+	}
+
 	private OrderSummaryResponse toSummaryResponse(Orders orders) {
 		OrderSummaryResponse response = new OrderSummaryResponse();
 		response.setId(orders.getId());
@@ -55,6 +89,8 @@ public class OrderService {
 	private OrderDetailResponse toDetailResponse(Orders orders) {
 		OrderDetailResponse response = new OrderDetailResponse();
 		response.setId(orders.getId());
+		response.setCouponId(orders.getCoupon() == null ? null : orders.getCoupon().getId());
+		response.setCouponCode(orders.getCoupon() == null ? null : orders.getCoupon().getCode());
 		response.setOrderDate(toLocalDateTime(orders.getOrderDate()));
 		response.setCreatedAt(toLocalDateTime(orders.getCreatedAt()));
 		response.setTotalPrice(orders.getTotalPrice());
@@ -72,6 +108,155 @@ public class OrderService {
 		}
 
 		return response;
+	}
+
+	private void applyUpsertRequest(Orders orders, OrderUpsertRequest request, boolean isCreate) {
+		Coupon coupon = resolveCoupon(request.getCouponId(), request.getCouponCode());
+		orders.setCoupon(coupon);
+
+		if (isCreate && orders.getCreatedAt() == null) {
+			orders.setCreatedAt(new Date());
+		}
+
+		if (request.getOrderDate() != null) {
+			orders.setOrderDate(Timestamp.valueOf(request.getOrderDate()));
+		} else if (isCreate && orders.getOrderDate() == null) {
+			orders.setOrderDate(orders.getCreatedAt());
+		}
+
+		Set<OrderDetail> details = new HashSet<>();
+		for (OrderItemRequest itemRequest : request.getItems()) {
+			Item item = itemDAO.findById(itemRequest.getItemId())
+					.orElseThrow(() -> new ResourceNotFoundException(
+							"Item with id " + itemRequest.getItemId() + " was not found"));
+
+			BigDecimal unitPrice = itemRequest.getUnitPrice() != null ? itemRequest.getUnitPrice() : item.getPrice();
+			if (unitPrice == null) {
+				throw new BadRequestException("Item price is required (itemId=" + item.getId() + ")");
+			}
+
+			OrderDetail detail = new OrderDetail();
+			detail.setOrders(orders);
+			detail.setItem(item);
+			detail.setQuantity(itemRequest.getQuantity());
+			detail.setPrice(unitPrice);
+			details.add(detail);
+		}
+
+		orders.getOrderDetails().clear();
+		orders.getOrderDetails().addAll(details);
+
+		BigDecimal totalPrice = calculateTotalPrice(details);
+		BigDecimal eligibleSubtotal = calculateEligibleSubtotal(coupon, details);
+		BigDecimal discountAmount = coupon == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+				: calculateDiscountAmount(coupon, eligibleSubtotal);
+		BigDecimal netValue = totalPrice.subtract(discountAmount);
+
+		orders.setTotalPrice(totalPrice);
+		orders.setDiscountAmount(discountAmount);
+		orders.setNetValue(netValue);
+	}
+
+	private BigDecimal calculateEligibleSubtotal(Coupon coupon, Set<OrderDetail> details) {
+		if (coupon == null || coupon.getPromotion() == null) {
+			return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+		}
+
+		Set<PromotionCategory> promotionCategories = coupon.getPromotion().getPromotionCategories();
+		if (promotionCategories == null || promotionCategories.isEmpty()) {
+			return calculateTotalPrice(details);
+		}
+
+		Set<Integer> allowedCategoryIds = promotionCategories.stream()
+				.map(pc -> pc.getCategory() == null ? null : pc.getCategory().getId())
+				.filter(id -> id != null)
+				.collect(java.util.stream.Collectors.toSet());
+
+		if (allowedCategoryIds.isEmpty()) {
+			return calculateTotalPrice(details);
+		}
+
+		BigDecimal eligibleTotal = BigDecimal.ZERO;
+		for (OrderDetail detail : details) {
+			if (detail.getItem() == null || detail.getItem().getCategory() == null
+					|| detail.getItem().getCategory().getId() == null) {
+				continue;
+			}
+			Integer categoryId = detail.getItem().getCategory().getId();
+			if (!allowedCategoryIds.contains(categoryId)) {
+				continue;
+			}
+
+			BigDecimal lineTotal = calculateLineTotal(detail.getPrice(), detail.getQuantity());
+			if (lineTotal != null) {
+				eligibleTotal = eligibleTotal.add(lineTotal);
+			}
+		}
+
+		return eligibleTotal.setScale(2, RoundingMode.HALF_UP);
+	}
+
+	private Coupon resolveCoupon(Integer couponId, String couponCode) {
+		if (couponId != null) {
+			Coupon coupon = couponDAO.findById(couponId)
+					.orElseThrow(() -> new ResourceNotFoundException("Coupon with id " + couponId + " was not found"));
+			validateCouponUsable(coupon);
+			return coupon;
+		}
+		if (couponCode == null || couponCode.trim().isEmpty()) {
+			return null;
+		}
+
+		String normalized = couponCode.trim();
+		Coupon coupon = couponDAO.findByCode(normalized)
+				.orElseThrow(() -> new ResourceNotFoundException("Coupon with code " + normalized + " was not found"));
+		validateCouponUsable(coupon);
+		return coupon;
+	}
+
+	private void validateCouponUsable(Coupon coupon) {
+		if (coupon == null) {
+			return;
+		}
+		Date now = new Date();
+
+		if (!coupon.isIsActive()) {
+			throw new BadRequestException("Coupon is inactive");
+		}
+		if (coupon.getExpireDate() != null && coupon.getExpireDate().before(now)) {
+			throw new BadRequestException("Coupon is expired");
+		}
+		if (coupon.getPromotion() != null) {
+			if (!coupon.getPromotion().isIsActive()) {
+				throw new BadRequestException("Promotion is inactive");
+			}
+			if (coupon.getPromotion().getStartAt() != null && coupon.getPromotion().getStartAt().after(now)) {
+				throw new BadRequestException("Promotion has not started");
+			}
+			if (coupon.getPromotion().getEndAt() != null && coupon.getPromotion().getEndAt().before(now)) {
+				throw new BadRequestException("Promotion has ended");
+			}
+		}
+	}
+
+	private BigDecimal calculateTotalPrice(Set<OrderDetail> details) {
+		BigDecimal total = BigDecimal.ZERO;
+		for (OrderDetail detail : details) {
+			BigDecimal lineTotal = calculateLineTotal(detail.getPrice(), detail.getQuantity());
+			if (lineTotal != null) {
+				total = total.add(lineTotal);
+			}
+		}
+		return total.setScale(2, RoundingMode.HALF_UP);
+	}
+
+	private BigDecimal calculateDiscountAmount(Coupon coupon, BigDecimal totalPrice) {
+		if (coupon == null || coupon.getPromotion() == null || coupon.getPromotion().getDiscountValue() == null) {
+			return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+		}
+		BigDecimal discountValue = coupon.getPromotion().getDiscountValue();
+		BigDecimal discount = discountValue.min(totalPrice);
+		return discount.setScale(2, RoundingMode.HALF_UP);
 	}
 
 	private BigDecimal calculateLineTotal(BigDecimal unitPrice, int quantity) {
