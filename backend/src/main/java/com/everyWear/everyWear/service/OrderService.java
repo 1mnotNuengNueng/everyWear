@@ -27,6 +27,7 @@ import com.everyWear.everyWear.model.OrderDetail;
 import com.everyWear.everyWear.model.Item;
 import com.everyWear.everyWear.model.Orders;
 import com.everyWear.everyWear.model.PromotionCategory;
+import com.everyWear.everyWear.model.OrderStatus;
 
 @Service
 @Transactional
@@ -59,6 +60,7 @@ public class OrderService {
 
 	public OrderDetailResponse createOrder(OrderUpsertRequest request) {
 		Orders orders = new Orders();
+		orders.setStatus(OrderStatus.ACTIVE);
 		applyUpsertRequest(orders, request, true);
 		return toDetailResponse(ordersDAO.save(orders));
 	}
@@ -66,19 +68,30 @@ public class OrderService {
 	public OrderDetailResponse updateOrder(Integer id, OrderUpsertRequest request) {
 		Orders orders = ordersDAO.findByIdWithDetails(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " was not found"));
+		if (orders.getStatus() == null) {
+			orders.setStatus(OrderStatus.ACTIVE);
+		}
+		if (orders.getStatus() == OrderStatus.CANCELLED) {
+			throw new BadRequestException("Cannot update a cancelled order");
+		}
 		applyUpsertRequest(orders, request, false);
 		return toDetailResponse(ordersDAO.save(orders));
 	}
 
 	public void deleteOrder(Integer id) {
-		Orders orders = ordersDAO.findById(id)
+		Orders orders = ordersDAO.findByIdWithDetails(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " was not found"));
-		ordersDAO.delete(orders);
+		if (orders.getStatus() == OrderStatus.CANCELLED) {
+			return;
+		}
+		orders.setStatus(OrderStatus.CANCELLED);
+		ordersDAO.save(orders);
 	}
 
 	private OrderSummaryResponse toSummaryResponse(Orders orders) {
 		OrderSummaryResponse response = new OrderSummaryResponse();
 		response.setId(orders.getId());
+		response.setStatus(orders.getStatus() == null ? OrderStatus.ACTIVE.name() : orders.getStatus().name());
 		response.setOrderDate(toLocalDateTime(orders.getOrderDate()));
 		response.setTotalPrice(orders.getTotalPrice());
 		response.setDiscountAmount(orders.getDiscountAmount());
@@ -89,6 +102,7 @@ public class OrderService {
 	private OrderDetailResponse toDetailResponse(Orders orders) {
 		OrderDetailResponse response = new OrderDetailResponse();
 		response.setId(orders.getId());
+		response.setStatus(orders.getStatus() == null ? OrderStatus.ACTIVE.name() : orders.getStatus().name());
 		response.setCouponId(orders.getCoupon() == null ? null : orders.getCoupon().getId());
 		response.setCouponCode(orders.getCoupon() == null ? null : orders.getCoupon().getCode());
 		response.setOrderDate(toLocalDateTime(orders.getOrderDate()));
@@ -111,6 +125,9 @@ public class OrderService {
 	}
 
 	private void applyUpsertRequest(Orders orders, OrderUpsertRequest request, boolean isCreate) {
+		if (orders.getStatus() == null) {
+			orders.setStatus(OrderStatus.ACTIVE);
+		}
 		Coupon coupon = resolveCoupon(request.getCouponId(), request.getCouponCode());
 		orders.setCoupon(coupon);
 

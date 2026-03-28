@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public class OrderSummaryResponse {
 
 	private Integer id;
+	private String status;
 	private LocalDateTime orderDate;
 	private BigDecimal totalPrice;
 	private BigDecimal discountAmount;
@@ -17,6 +18,14 @@ public class OrderSummaryResponse {
 
 	public void setId(Integer id) {
 		this.id = id;
+	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
 	}
 
 	public LocalDateTime getOrderDate() {
@@ -51,4 +60,3 @@ public class OrderSummaryResponse {
 		this.netValue = netValue;
 	}
 }
-

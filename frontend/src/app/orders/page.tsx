@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 type OrderSummary = {
   id: number;
+  status: string;
   orderDate: string | null;
   totalPrice: string | number | null;
   discountAmount: string | number | null;
@@ -66,10 +67,9 @@ export default async function OrdersPage() {
         <div className="mt-8 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="grid grid-cols-12 gap-3 border-b border-zinc-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
             <div className="col-span-2">Order</div>
-            <div className="col-span-4">วันที่</div>
-            <div className="col-span-2 text-right">ก่อนลด</div>
-            <div className="col-span-2 text-right">ส่วนลด</div>
-            <div className="col-span-2 text-right">สุทธิ</div>
+            <div className="col-span-2">Status</div>
+            <div className="col-span-5">วันที่</div>
+            <div className="col-span-3 text-right">สุทธิ</div>
           </div>
 
           {orders.length === 0 ? (
@@ -87,16 +87,21 @@ export default async function OrdersPage() {
                     <div className="col-span-2 font-medium text-zinc-900 dark:text-zinc-50">
                       #{order.id}
                     </div>
-                    <div className="col-span-4 text-zinc-700 dark:text-zinc-200">
+                    <div className="col-span-2">
+                      {order.status === "CANCELLED" ? (
+                        <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-200">
+                          CANCELLED
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <div className="col-span-5 text-zinc-700 dark:text-zinc-200">
                       {formatDateTime(order.orderDate)}
                     </div>
-                    <div className="col-span-2 text-right text-zinc-700 dark:text-zinc-200">
-                      {formatMoney(order.totalPrice)}
-                    </div>
-                    <div className="col-span-2 text-right text-zinc-700 dark:text-zinc-200">
-                      {formatMoney(order.discountAmount)}
-                    </div>
-                    <div className="col-span-2 text-right font-medium text-zinc-900 dark:text-zinc-50">
+                    <div className="col-span-3 text-right font-medium text-zinc-900 dark:text-zinc-50">
                       {formatMoney(order.netValue)}
                     </div>
                   </Link>
