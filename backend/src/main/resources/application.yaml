@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8080} # 👈 ให้ Railway กำหนด Port ให้ ถ้าไม่มี (รันในเครื่อง) จะใช้ 8080
+  port: 8080
 
 spring:
   application:    
@@ -10,6 +10,8 @@ spring:
     password: 
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
+    # 2. บังคับใส่ Dialect ไปเลยเพื่อป้องกัน Spring Boot เดาผิด
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
     show-sql: true
