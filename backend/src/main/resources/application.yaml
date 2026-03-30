@@ -4,10 +4,11 @@ server:
 spring:
   application:    
     name: everyWear
+spring:
   datasource:
-    url: {DB_URL}
-    username: {DB_USER}
-    password: {DB_PASS}
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     # 2. บังคับใส่ Dialect ไปเลยเพื่อป้องกัน Spring Boot เดาผิด
