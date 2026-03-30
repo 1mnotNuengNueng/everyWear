@@ -2,8 +2,7 @@ server:
   port: 8080
 
 spring:
-  application:
-    name: everyWear
+  application:    name: everyWear
   datasource:
     # 1. เอาค่าจริงมาใส่ตรงๆ ชั่วคราว (ลบ ${} ออกไปก่อน)
     url: ${DB_URL}
