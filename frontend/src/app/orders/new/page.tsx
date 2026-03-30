@@ -15,19 +15,9 @@ type ItemOption = {
   categoryName: string | null;
 };
 
-type CouponOption = {
-  id: number;
-  code: string;
-  discountValue: string | number | null;
-  promotionName: string;
-  allowedCategoryIds?: number[] | null;
-};
-
 export default async function NewOrderPage() {
-  const [items, coupons] = await Promise.all([
-    apiGetJson<ItemOption[]>("/api/items"),
-    apiGetJson<CouponOption[]>("/api/coupons"),
-  ]);
+  // NOTE: Depends on backend Items API (friend-owned): GET /api/items
+  const items = await apiGetJson<ItemOption[]>("/api/items");
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 font-sans dark:bg-black">
@@ -52,7 +42,6 @@ export default async function NewOrderPage() {
         <OrderUpsertForm
           mode="create"
           items={items}
-          coupons={coupons}
           action={createOrderAction}
         />
       </main>

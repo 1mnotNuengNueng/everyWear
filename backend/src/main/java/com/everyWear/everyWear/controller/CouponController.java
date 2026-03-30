@@ -22,6 +22,17 @@ import com.everyWear.everyWear.service.CouponService;
 
 import jakarta.validation.Valid;
 
+/**
+ * NOTE: Friend-owned area (Coupons API) — waiting to be extended/maintained by the teammate responsible for Coupons.
+ *
+ * Endpoints:
+ * - POST /api/coupons : create coupon
+ * - GET /api/coupons : list coupons
+ * - GET /api/coupons/{id} : get coupon by id
+ * - PUT /api/coupons/{id} : update coupon
+ * - DELETE /api/coupons/{id} : delete coupon
+ */
+
 @Validated
 @RestController
 @RequestMapping("/api/coupons")
@@ -71,14 +82,15 @@ public class CouponController {
 		return ResponseEntity.noContent().build();
 	}
 
-	@PostMapping("/partner/coupons")
-    public ResponseEntity<CouponResponse> createPartnerCoupon(@Valid @RequestBody CouponRequest request) { // เปลี่ยนชื่อเมธอด
-        // เรียกใช้ createPartnerCoupon จาก Service แทน
-        return ResponseEntity.status(HttpStatus.CREATED).body(couponService.createPartnerCoupon(request)); 
-    }
 
-	@GetMapping("/promotions/{id}") // <--- เปลี่ยนตรงนี้ครับ
-    public ResponseEntity<List<CouponResponse>> getAllCouponsByPromotionId(@PathVariable Integer id) {
-        return ResponseEntity.ok(couponService.getAllCouponsByPromotionId(id));
-    }
+	@PostMapping("/partner")
+	public ResponseEntity<CouponResponse> createPartnerCoupon() {
+		return ResponseEntity.status(HttpStatus.CREATED).body(couponService.createPartnerCoupon());
+	}
+
+	@GetMapping("/promotions/{id}")
+	public ResponseEntity<List<CouponResponse>> getAllCouponsByPromotionId(@PathVariable Integer id) {
+		return ResponseEntity.ok(couponService.getAllCouponsByPromotionId(id));
+	}
+
 }
