@@ -15,15 +15,23 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.everyWear.everyWear.dto.coupon.CouponCodeValidationRequest;
 import com.everyWear.everyWear.dto.coupon.CouponRequest;
 import com.everyWear.everyWear.dto.coupon.CouponResponse;
 import com.everyWear.everyWear.dto.coupon.CouponStatusUpdateRequest;
-import com.everyWear.everyWear.dto.coupon.CouponValidationResponse;
 import com.everyWear.everyWear.service.CouponService;
 
 import jakarta.validation.Valid;
 
+/**
+ * NOTE: Friend-owned area (Coupons API) — waiting to be extended/maintained by the teammate responsible for Coupons.
+ *
+ * Endpoints:
+ * - POST /api/coupons : create coupon
+ * - GET /api/coupons : list coupons
+ * - GET /api/coupons/{id} : get coupon by id
+ * - PUT /api/coupons/{id} : update coupon
+ * - DELETE /api/coupons/{id} : delete coupon
+ */
 @Validated
 @RestController
 @RequestMapping("/api/coupons")
@@ -38,12 +46,6 @@ public class CouponController {
 	@PostMapping
 	public ResponseEntity<CouponResponse> createCoupon(@Valid @RequestBody CouponRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(couponService.createCoupon(request));
-	}
-
-	@PostMapping("/validate")
-	public ResponseEntity<CouponValidationResponse> validateCouponCode(
-			@Valid @RequestBody CouponCodeValidationRequest request) {
-		return ResponseEntity.ok(couponService.validateCouponCode(request));
 	}
 
 	@GetMapping
@@ -78,4 +80,15 @@ public class CouponController {
 		couponService.deleteCoupon(id);
 		return ResponseEntity.noContent().build();
 	}
+
+	@PostMapping("/partner/coupons")
+    public ResponseEntity<CouponResponse> createPartnerCoupon(@Valid @RequestBody CouponRequest request) { // เปลี่ยนชื่อเมธอด
+        // เรียกใช้ createPartnerCoupon จาก Service แทน
+        return ResponseEntity.status(HttpStatus.CREATED).body(couponService.createPartnerCoupon(request)); 
+    }
+
+	@GetMapping("/promotions/{id}") // <--- เปลี่ยนตรงนี้ครับ
+    public ResponseEntity<List<CouponResponse>> getAllCouponsByPromotionId(@PathVariable Integer id) {
+        return ResponseEntity.ok(couponService.getAllCouponsByPromotionId(id));
+    }
 }

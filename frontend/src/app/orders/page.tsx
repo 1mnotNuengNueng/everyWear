@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { apiGetJson } from "@/lib/api";
+import { deleteOrderAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 

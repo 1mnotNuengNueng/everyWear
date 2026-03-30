@@ -10,14 +10,6 @@ type ItemOption = {
   categoryName: string | null;
 };
 
-type CouponOption = {
-  id: number;
-  code: string;
-  discountValue: string | number | null;
-  promotionName: string;
-  allowedCategoryIds?: number[] | null;
-};
-
 type InitialOrder = {
   id: number;
   couponId: number | null;
@@ -47,16 +39,18 @@ function formatMoney(value: string | number | null) {
 export default function OrderUpsertForm(props: {
   mode: "create" | "edit";
   items: ItemOption[];
-  coupons: CouponOption[];
   initial?: InitialOrder;
   action: (formData: FormData) => void | Promise<void>;
 }) {
-  const [couponId, setCouponId] = useState<number | "">(
-    props.initial?.couponId ?? "",
-  );
   const [couponCode, setCouponCode] = useState<string>(
     props.initial?.couponCode ?? "",
   );
+  const [couponCheckMessage, setCouponCheckMessage] = useState<string | null>(
+    null,
+  );
+  const [couponCheckTone, setCouponCheckTone] = useState<
+    "info" | "warning" | "error"
+  >("info");
 
   const [lines, setLines] = useState<OrderLine[]>(() => {
     const initialLines = props.initial?.items ?? [];
@@ -70,33 +64,6 @@ export default function OrderUpsertForm(props: {
     }));
   });
 
-  const selectedCoupon = useMemo(() => {
-    if (couponId === "") return null;
-    return props.coupons.find((coupon) => coupon.id === couponId) ?? null;
-  }, [couponId, props.coupons]);
-
-  const couponIssues = useMemo(() => {
-    if (!selectedCoupon || !selectedCoupon.allowedCategoryIds || selectedCoupon.allowedCategoryIds.length === 0) {
-      return [];
-    }
-    const allowed = new Set(selectedCoupon.allowedCategoryIds);
-
-    const issues: string[] = [];
-    for (const line of lines) {
-      if (line.itemId === "") continue;
-      const item = props.items.find((it) => it.id === Number(line.itemId));
-      if (!item) continue;
-      if (item.categoryId === null || item.categoryId === undefined) {
-        issues.push(`สินค้า "${item.name}" ไม่มีหมวดหมู่ จึงใช้คูปองนี้ไม่ได้`);
-        continue;
-      }
-      if (!allowed.has(item.categoryId)) {
-        issues.push(`สินค้า "${item.name}" ใช้คูปองนี้ไม่ได้`);
-      }
-    }
-    return issues;
-  }, [lines, props.items, selectedCoupon]);
-
   const payloadJson = useMemo(() => {
     const normalizedItems = lines
       .filter((line) => line.itemId !== "")
@@ -108,13 +75,12 @@ export default function OrderUpsertForm(props: {
       });
 
     return JSON.stringify({
-      couponId: couponId === "" ? null : couponId,
-      couponCode:
-        couponId === "" && couponCode.trim() !== "" ? couponCode.trim() : null,
+      couponId: null,
+      couponCode: couponCode.trim() !== "" ? couponCode.trim() : null,
       orderDate: null,
       items: normalizedItems,
     });
-  }, [couponCode, couponId, lines]);
+  }, [couponCode, lines]);
 
   const isValid = useMemo(() => {
     const hasAtLeastOneItem = lines.some((line) => line.itemId !== "");
@@ -145,54 +111,11 @@ export default function OrderUpsertForm(props: {
     return total;
   }, [lines, props.items]);
 
-  const eligibleSubtotalForCoupon = useMemo(() => {
-    if (!selectedCoupon) return calculatedSubtotal;
-    if (!selectedCoupon.allowedCategoryIds || selectedCoupon.allowedCategoryIds.length === 0) {
-      return calculatedSubtotal;
-    }
-
-    const allowed = new Set(selectedCoupon.allowedCategoryIds);
-    let total = 0;
-    for (const line of lines) {
-      if (line.itemId === "") continue;
-      const qty = Number(line.quantity);
-      if (!Number.isFinite(qty) || qty <= 0) continue;
-
-      const item = props.items.find((it) => it.id === Number(line.itemId));
-      if (!item || item.categoryId === null || item.categoryId === undefined) continue;
-      if (!allowed.has(item.categoryId)) continue;
-
-      const itemPrice =
-        item.price === null || item.price === undefined
-          ? null
-          : typeof item.price === "string"
-            ? Number(item.price)
-            : item.price;
-      if (itemPrice !== null && Number.isFinite(itemPrice)) {
-        total += itemPrice * qty;
-      }
-    }
-    return total;
-  }, [calculatedSubtotal, lines, props.items, selectedCoupon]);
-
-  const calculatedDiscount = useMemo(() => {
-    if (!selectedCoupon || selectedCoupon.discountValue === null || selectedCoupon.discountValue === undefined) {
-      return 0;
-    }
-    const discount =
-      typeof selectedCoupon.discountValue === "string"
-        ? Number(selectedCoupon.discountValue)
-        : selectedCoupon.discountValue;
-    if (!Number.isFinite(discount)) return 0;
-    return Math.min(eligibleSubtotalForCoupon, discount);
-  }, [eligibleSubtotalForCoupon, selectedCoupon]);
-
-  const calculatedNet = useMemo(() => {
-    return Math.max(0, calculatedSubtotal - calculatedDiscount);
-  }, [calculatedDiscount, calculatedSubtotal]);
-
   return (
-    <form action={props.action} className="mt-8 grid gap-6">
+    <form
+      action={props.action}
+      className="mt-8 grid gap-6"
+    >
       <input type="hidden" name="payload" value={payloadJson} />
 
       {/* กล่องเลือกคูปอง */}
@@ -311,7 +234,9 @@ export default function OrderUpsertForm(props: {
               <div className="col-span-2 flex items-center justify-end text-sm font-medium text-gray-800">
                 {(() => {
                   if (line.itemId === "") return "-";
-                  const item = props.items.find((it) => it.id === Number(line.itemId));
+                  const item = props.items.find(
+                    (it) => it.id === Number(line.itemId),
+                  );
                   return item ? formatMoney(item.price) : "-";
                 })()}
               </div>
@@ -388,8 +313,8 @@ export default function OrderUpsertForm(props: {
               </span>
             </div>
           </div>
-        </div>
-      </div>
+	        </div>
+	      </div>
 
       {/* ปุ่ม Submit */}
       <button
