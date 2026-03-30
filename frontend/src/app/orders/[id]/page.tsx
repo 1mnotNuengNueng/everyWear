@@ -7,12 +7,13 @@ import { deleteOrderAction } from "../actions";
 export const dynamic = "force-dynamic";
 
 type OrderItem = {
-  itemId: number | null;
-  itemName: string | null;
-  quantity: number;
-  unitPrice: string | number | null;
-  lineTotal: string | number | null;
-};
+	  itemId: number | null;
+	  itemName: string | null;
+	  size: string | null;
+	  quantity: number;
+	  unitPrice: string | number | null;
+	  lineTotal: string | number | null;
+	};
 
 type OrderDetail = {
   id: number;
@@ -130,7 +131,8 @@ export default async function OrderDetailPage({
       {/* ตารางรายการสินค้า */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
         <div className="grid grid-cols-12 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500">
-          <div className="col-span-6">รายการสินค้า</div>
+          <div className="col-span-4">รายการสินค้า</div>
+          <div className="col-span-2">ไซส์</div>
           <div className="col-span-2 text-right">จำนวน</div>
           <div className="col-span-2 text-right">ราคาต่อชิ้น</div>
           <div className="col-span-2 text-right">รวม</div>
@@ -147,8 +149,11 @@ export default async function OrderDetailPage({
                 key={`${item.itemId ?? "unknown"}-${index}`}
                 className="grid grid-cols-12 gap-3 px-6 py-4 text-sm items-center hover:bg-gray-50"
               >
-                <div className="col-span-6 font-bold text-gray-800">
+                <div className="col-span-4 font-bold text-gray-800">
                   {item.itemName ?? `Item #${item.itemId ?? "-"}`}
+                </div>
+                <div className="col-span-2 text-gray-600">
+                  {item.size ?? "-"}
                 </div>
                 <div className="col-span-2 text-right text-gray-600">
                   {item.quantity}

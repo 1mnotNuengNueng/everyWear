@@ -5,8 +5,10 @@ import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.everyWear.everyWear.DAO.CouponDAO;
 import com.everyWear.everyWear.DAO.ItemDAO;
 import com.everyWear.everyWear.DAO.OrdersDAO;
+import com.everyWear.everyWear.DAO.StockDAO;
 import com.everyWear.everyWear.dto.order.OrderDetailResponse;
 import com.everyWear.everyWear.dto.order.OrderItemResponse;
 import com.everyWear.everyWear.dto.order.OrderItemRequest;
@@ -28,6 +31,7 @@ import com.everyWear.everyWear.model.Item;
 import com.everyWear.everyWear.model.Orders;
 import com.everyWear.everyWear.model.PromotionCategory;
 import com.everyWear.everyWear.model.OrderStatus;
+import com.everyWear.everyWear.model.Stock;
 
 @Service
 @Transactional
@@ -36,11 +40,16 @@ public class OrderService {
 	private final OrdersDAO ordersDAO;
 	private final ItemDAO itemDAO;
 	private final CouponDAO couponDAO;
+	private final StockDAO stockDAO;
 
-	public OrderService(OrdersDAO ordersDAO, ItemDAO itemDAO, CouponDAO couponDAO) {
+	public OrderService(OrdersDAO ordersDAO, ItemDAO itemDAO, CouponDAO couponDAO, StockDAO stockDAO) {
 		this.ordersDAO = ordersDAO;
 		this.itemDAO = itemDAO;
 		this.couponDAO = couponDAO;
+		this.stockDAO = stockDAO;
+	}
+
+	private record ItemSizeKey(Integer itemId, String size) {
 	}
 
 	@Transactional(readOnly = true)
@@ -78,6 +87,7 @@ public class OrderService {
 		Orders orders = new Orders();
 		orders.setStatus(OrderStatus.ACTIVE);
 		applyUpsertRequest(orders, request, true);
+		applyStockDelta(Map.of(), summarizeOrderDetails(orders.getOrderDetails()));
 		Orders saved = ordersDAO.save(orders);
 		deactivateCouponIfPresent(saved.getCoupon());
 		return toDetailResponse(saved);
@@ -92,7 +102,11 @@ public class OrderService {
 		if (orders.getStatus() == OrderStatus.CANCELLED) {
 			throw new BadRequestException("Cannot update a cancelled order");
 		}
+
+		Map<ItemSizeKey, Integer> before = summarizeOrderDetails(orders.getOrderDetails());
 		applyUpsertRequest(orders, request, false);
+		Map<ItemSizeKey, Integer> after = summarizeOrderDetails(orders.getOrderDetails());
+		applyStockDelta(before, after);
 		Orders saved = ordersDAO.save(orders);
 		deactivateCouponIfPresent(saved.getCoupon());
 		return toDetailResponse(saved);
@@ -108,6 +122,7 @@ public class OrderService {
 		if (orders.getStatus() == OrderStatus.CANCELLED) {
 			return;
 		}
+		applyStockDelta(summarizeOrderDetails(orders.getOrderDetails()), Map.of());
 		orders.setStatus(OrderStatus.CANCELLED);
 		ordersDAO.save(orders);
 	}
@@ -135,15 +150,16 @@ public class OrderService {
 		response.setDiscountAmount(orders.getDiscountAmount());
 		response.setNetValue(orders.getNetValue());
 
-		for (OrderDetail detail : orders.getOrderDetails()) {
-			OrderItemResponse itemResponse = new OrderItemResponse();
-			itemResponse.setItemId(detail.getItem() == null ? null : detail.getItem().getId());
-			itemResponse.setItemName(detail.getItem() == null ? null : detail.getItem().getName());
-			itemResponse.setQuantity(detail.getQuantity());
-			itemResponse.setUnitPrice(detail.getPrice());
-			itemResponse.setLineTotal(calculateLineTotal(detail.getPrice(), detail.getQuantity()));
-			response.getItems().add(itemResponse);
-		}
+			for (OrderDetail detail : orders.getOrderDetails()) {
+				OrderItemResponse itemResponse = new OrderItemResponse();
+				itemResponse.setItemId(detail.getItem() == null ? null : detail.getItem().getId());
+				itemResponse.setItemName(detail.getItem() == null ? null : detail.getItem().getName());
+				itemResponse.setSize(detail.getSize());
+				itemResponse.setQuantity(detail.getQuantity());
+				itemResponse.setUnitPrice(detail.getPrice());
+				itemResponse.setLineTotal(calculateLineTotal(detail.getPrice(), detail.getQuantity()));
+				response.getItems().add(itemResponse);
+			}
 
 		return response;
 	}
@@ -171,24 +187,25 @@ public class OrderService {
 			orders.setOrderDate(orders.getCreatedAt());
 		}
 
-		Set<OrderDetail> details = new HashSet<>();
-		for (OrderItemRequest itemRequest : request.getItems()) {
-			Item item = itemDAO.findById(itemRequest.getItemId())
-					.orElseThrow(() -> new ResourceNotFoundException(
-							"Item with id " + itemRequest.getItemId() + " was not found"));
+			Set<OrderDetail> details = new HashSet<>();
+			for (OrderItemRequest itemRequest : request.getItems()) {
+				Item item = itemDAO.findById(itemRequest.getItemId())
+						.orElseThrow(() -> new ResourceNotFoundException(
+								"Item with id " + itemRequest.getItemId() + " was not found"));
 
 			BigDecimal unitPrice = itemRequest.getUnitPrice() != null ? itemRequest.getUnitPrice() : item.getPrice();
 			if (unitPrice == null) {
 				throw new BadRequestException("Item price is required (itemId=" + item.getId() + ")");
 			}
 
-			OrderDetail detail = new OrderDetail();
-			detail.setOrders(orders);
-			detail.setItem(item);
-			detail.setQuantity(itemRequest.getQuantity());
-			detail.setPrice(unitPrice);
-			details.add(detail);
-		}
+				OrderDetail detail = new OrderDetail();
+				detail.setOrders(orders);
+				detail.setItem(item);
+				detail.setSize(itemRequest.getSize() == null ? null : itemRequest.getSize().trim());
+				detail.setQuantity(itemRequest.getQuantity());
+				detail.setPrice(unitPrice);
+				details.add(detail);
+			}
 
 		orders.getOrderDetails().clear();
 		orders.getOrderDetails().addAll(details);
@@ -201,7 +218,96 @@ public class OrderService {
 
 		orders.setTotalPrice(totalPrice);
 		orders.setDiscountAmount(discountAmount);
-		orders.setNetValue(netValue);
+			orders.setNetValue(netValue);
+		}
+
+	private Map<ItemSizeKey, Integer> summarizeOrderDetails(Set<OrderDetail> details) {
+		Map<ItemSizeKey, Integer> summary = new HashMap<>();
+		if (details == null || details.isEmpty()) {
+			return summary;
+		}
+
+		for (OrderDetail detail : details) {
+			if (detail == null || detail.getItem() == null || detail.getItem().getId() == null) {
+				continue;
+			}
+			Integer itemId = detail.getItem().getId();
+			String size = detail.getSize() == null ? null : detail.getSize().trim();
+			if (size == null || size.isEmpty()) {
+				continue;
+			}
+			int quantity = detail.getQuantity();
+			if (quantity <= 0) {
+				continue;
+			}
+			ItemSizeKey key = new ItemSizeKey(itemId, size);
+			summary.merge(key, quantity, Integer::sum);
+		}
+
+		return summary;
+	}
+
+	private void applyStockDelta(Map<ItemSizeKey, Integer> before, Map<ItemSizeKey, Integer> after) {
+		Set<ItemSizeKey> keys = new HashSet<>();
+		keys.addAll(before.keySet());
+		keys.addAll(after.keySet());
+
+		for (ItemSizeKey key : keys) {
+			int oldQty = before.getOrDefault(key, 0);
+			int newQty = after.getOrDefault(key, 0);
+			int diff = newQty - oldQty;
+			if (diff == 0) {
+				continue;
+			}
+			if (diff > 0) {
+				consumeStock(key, diff);
+			} else {
+				releaseStock(key, -diff);
+			}
+		}
+	}
+
+	private void consumeStock(ItemSizeKey key, int amount) {
+		if (amount <= 0) {
+			return;
+		}
+
+		Stock stock = stockDAO.findForUpdateByItemIdAndSize(key.itemId(), key.size())
+				.orElseThrow(() -> new BadRequestException(
+						"Stock not found for itemId=" + key.itemId() + ", size=" + key.size()));
+
+		int available = stock.getQuantity();
+		if (available < amount) {
+			throw new BadRequestException(
+					"Insufficient stock for itemId=" + key.itemId() + ", size=" + key.size()
+							+ " (available=" + available + ", requested=" + amount + ")");
+		}
+
+		stock.setQuantity(available - amount);
+		stock.setUpdatedAt(new Date());
+		stockDAO.save(stock);
+	}
+
+	private void releaseStock(ItemSizeKey key, int amount) {
+		if (amount <= 0) {
+			return;
+		}
+
+		Stock stock = stockDAO.findForUpdateByItemIdAndSize(key.itemId(), key.size())
+				.orElseGet(() -> {
+					Item item = itemDAO.findById(key.itemId()).orElseThrow(
+							() -> new ResourceNotFoundException("Item with id " + key.itemId() + " was not found"));
+					Stock created = new Stock();
+					created.setItem(item);
+					created.setSize(key.size());
+					created.setQuantity(0);
+					created.setUpdatedAt(new Date());
+					return created;
+				});
+
+		stock.setQuantity(stock.getQuantity() + amount);
+		stock.setUpdatedAt(new Date());
+		stockDAO.save(stock);
 	}
 
 	private Coupon enforceCouponUnchanged(Coupon existingCoupon, Integer requestCouponId, String requestCouponCode) {

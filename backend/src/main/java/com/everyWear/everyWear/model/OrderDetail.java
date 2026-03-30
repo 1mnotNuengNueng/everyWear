@@ -23,15 +23,17 @@ public class OrderDetail implements java.io.Serializable {
 	private Integer id;
 	private Item item;
 	private Orders orders;
+	private String size;
 	private int quantity;
 	private BigDecimal price;
 
 	public OrderDetail() {
 	}
 
-	public OrderDetail(Item item, Orders orders, int quantity, BigDecimal price) {
+	public OrderDetail(Item item, Orders orders, String size, int quantity, BigDecimal price) {
 		this.item = item;
 		this.orders = orders;
+		this.size = size;
 		this.quantity = quantity;
 		this.price = price;
 	}
@@ -64,6 +66,15 @@ public class OrderDetail implements java.io.Serializable {
 
 	public void setOrders(Orders orders) {
 		this.orders = orders;
+	}
+
+	@Column(name = "size", length = 10)
+	public String getSize() {
+		return this.size;
+	}
+
+	public void setSize(String size) {
+		this.size = size;
 	}
 
 	@Column(name = "quantity", nullable = false)
