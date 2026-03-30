@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache"; // 👈 1. Import ตัวนี้เข้ามา
 import { redirect } from "next/navigation";
 
 import { apiUrl } from "@/lib/api";
@@ -42,6 +43,8 @@ export async function createOrderAction(formData: FormData) {
     body: payload,
   });
 
+  // 👈 2. ล้าง Cache ของหน้ารวมออเดอร์ เผื่อว่ากลับไปหน้าแรกจะได้เห็นออเดอร์ใหม่ทันที
+  revalidatePath("/orders"); 
   redirect(`/orders/${result.id}`);
 }
 
@@ -54,6 +57,10 @@ export async function updateOrderAction(orderId: number, formData: FormData) {
     body: payload,
   });
 
+  // 👈 3. ล้าง Cache ของหน้ารวม และ หน้ารายละเอียดออเดอร์นั้นๆ
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+  
   redirect(`/orders/${result.id}`);
 }
 
@@ -77,5 +84,8 @@ export async function deleteOrderAction(orderId: number, redirectTo?: string) {
     }
   }
 
+  // 👈 4. ล้าง Cache ของหน้ารวมออเดอร์ เพื่อให้ออเดอร์ที่ถูกลบ/ยกเลิก หายไปจาก List
+  revalidatePath("/orders");
+  
   redirect(redirectTo ?? "/orders");
 }

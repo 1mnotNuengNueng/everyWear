@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-const API_BASE_URL = "http://localhost:8080/api";
+// 1. 🌟 ดึง URL จาก .env ถ้าไม่มีให้ใช้ localhost (สำหรับรันในเครื่อง)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 // 1. สร้างโปรโมชั่นใหม่ (POST)
 export async function createPromotionAction(formData: FormData) {
-  // รับค่า JSON String จากฟอร์ม
   const payloadStr = formData.get("payload") as string;
   const payload = JSON.parse(payloadStr);
 
@@ -19,7 +19,6 @@ export async function createPromotionAction(formData: FormData) {
 
   if (!res.ok) throw new Error("เกิดข้อผิดพลาดในการสร้างโปรโมชั่น");
 
-  // สั่งให้รีเฟรชหน้า /promotions แล้วเด้งกลับไป
   revalidatePath("/promotions");
   redirect("/promotions");
 }
@@ -37,7 +36,10 @@ export async function updatePromotionAction(id: number, formData: FormData) {
 
   if (!res.ok) throw new Error("เกิดข้อผิดพลาดในการอัปเดตโปรโมชั่น");
 
+  // 2. 🌟 ล้าง Cache ทั้งหน้ารวม และ หน้ารายละเอียดโปรโมชั่นนั้นๆ
   revalidatePath("/promotions");
+  revalidatePath(`/promotions/${id}`);
+  
   redirect("/promotions");
 }
 
@@ -49,6 +51,9 @@ export async function deletePromotionAction(id: number) {
 
   if (!res.ok) throw new Error("เกิดข้อผิดพลาดในการลบโปรโมชั่น");
 
-  // ลบเสร็จให้รีเฟรชหน้าปัจจุบัน (เพื่อให้ Card หายไป)
   revalidatePath("/promotions");
+  
+  // หมายเหตุ: ถ้าคุณเรียกใช้ Action นี้จากหน้ารายละเอียด (PromotionDetailPage) 
+  // การใส่ redirect จะช่วยให้มันเด้งกลับหน้ารวมอัตโนมัติครับ
+  // แต่ถ้าคุณลบจากหน้าที่มี Client Component ที่จัดการ Router.push เองอยู่แล้ว ตรงนี้ไม่ต้องใส่ก็ได้ครับ
 }
