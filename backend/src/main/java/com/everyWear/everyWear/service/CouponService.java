@@ -28,6 +28,8 @@ public class CouponService {
 	private static final String COUPON_CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 	private static final int COUPON_CODE_LENGTH = 10;
 	private static final int MAX_CODE_GENERATION_ATTEMPTS = 20;
+	private static final int PARTNER_PROMOTION_ID = 1;
+	private static final int PARTNER_COUPON_EXPIRE_DAYS = 30;
 
 	private final CouponDAO couponDAO;
 	private final PromotionDAO promotionDAO;
@@ -83,6 +85,27 @@ public class CouponService {
 	public void deleteCoupon(Integer id) {
 		Coupon coupon = getCouponEntityById(id);
 		couponDAO.delete(coupon);
+	}
+
+	public CouponResponse createPartnerCoupon() {
+		Promotion promotion = getPromotionById(PARTNER_PROMOTION_ID);
+		Coupon coupon = new Coupon();
+		coupon.setPromotion(promotion);
+		coupon.setCode(generateUniqueCouponCode());
+		coupon.setExpireDate(Timestamp.valueOf(LocalDateTime.now().plusDays(PARTNER_COUPON_EXPIRE_DAYS)));
+		coupon.setIsActive(true);
+		coupon.setCreatedAt(new Date());
+
+		return toResponse(couponDAO.save(coupon));
+	}
+
+	@Transactional(readOnly = true)
+	public List<CouponResponse> getAllCouponsByPromotionId(Integer promotionId) {
+		getPromotionById(promotionId);
+		return couponDAO.findByPromotion_Id(promotionId)
+				.stream()
+				.map(this::toResponse)
+				.toList();
 	}
 
 	private void applyRequestToCoupon(Coupon coupon, CouponRequest request, Promotion promotion, String code) {
@@ -189,36 +212,4 @@ public class CouponService {
 		}
 		return new Timestamp(value.getTime()).toLocalDateTime();
 	}
-
-public CouponResponse createPartnerCoupon(CouponRequest request) {
-        // 1. บังคับเซ็ต Promotion ID เป็น 1 สำหรับ Partner เสมอ
-        request.setPromotionId(1);
-        
-        // 2. บังคับเซ็ตวันหมดอายุ เป็นเวลาปัจจุบัน + 30 วัน
-        request.setExpireDate(LocalDateTime.now().plusDays(30));
-
-        // 3. ดึง Promotion (ระบบจะดึง ID 1 มาให้เสมอตามที่เซ็ตไว้)     
-        Promotion promotion = getPromotionById(request.getPromotionId());
-        
-        Coupon coupon = new Coupon();
-        
-        applyRequestToCoupon(coupon, request, promotion, generateUniqueCouponCode());
-        coupon.setCreatedAt(new Date());
-
-        return toResponse(couponDAO.save(coupon));
-    }
-
-// เปลี่ยน Parameter เป็นรับแค่ ID และคืนค่าเป็น List
-    @Transactional(readOnly = true)
-    public List<CouponResponse> getAllCouponsByPromotionId(Integer promotionId) {
-        
-        // เช็คก่อนว่ามี Promotion นี้อยู่จริงไหม
-        Promotion promotion = getPromotionById(promotionId);
-
-        // คุณต้องไปเพิ่มคำสั่ง findByPromotion_Id(promotionId) ใน CouponDAO ก่อนนะครับ
-        return couponDAO.findByPromotion_Id(promotionId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
 }
