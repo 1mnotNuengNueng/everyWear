@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiGetJson, apiRequestJson } from "@/lib/api";
 
 type Category = {
   id: number;
@@ -36,30 +37,33 @@ export default function ItemsPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchItems = async () => {
-    const res = await fetch("http://localhost:8080/api/items");
-    const data = (await res.json()) as Item[];
+    const data = await apiGetJson<Item[]>("/api/items");
     setItems(data);
+    setLoadError(null);
   };
 
   useEffect(() => {
     let ignore = false;
 
     const loadInitialData = async () => {
-      const [itemsRes, categoriesRes] = await Promise.all([
-        fetch("http://localhost:8080/api/items"),
-        fetch("http://localhost:8080/api/categories"),
-      ]);
+      try {
+        const [itemsData, categoriesData] = await Promise.all([
+          apiGetJson<Item[]>("/api/items"),
+          apiGetJson<Category[]>("/api/categories"),
+        ]);
 
-      const [itemsData, categoriesData] = (await Promise.all([
-        itemsRes.json(),
-        categoriesRes.json(),
-      ])) as [Item[], Category[]];
-
-      if (!ignore) {
-        setItems(itemsData);
-        setCategories(categoriesData);
+        if (!ignore) {
+          setItems(itemsData);
+          setCategories(categoriesData);
+          setLoadError(null);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
       }
     };
 
@@ -105,21 +109,20 @@ export default function ItemsPage() {
       category: categoryId ? { id: Number(categoryId) } : null,
     };
 
-    const res = editingId
-      ? await fetch(`http://localhost:8080/api/items/${editingId}`, {
+    try {
+      if (editingId) {
+        await apiRequestJson(`/api/items/${editingId}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-      : await fetch("http://localhost:8080/api/items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body,
         });
-
-    if (!res.ok) {
-      const msg = await res.text();
-      alert(msg);
+      } else {
+        await apiRequestJson("/api/items", {
+          method: "POST",
+          body,
+        });
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
       return;
     }
 
@@ -138,13 +141,12 @@ export default function ItemsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("ลบสินค้านี้ใช่ไหม?")) return;
 
-    const res = await fetch(`http://localhost:8080/api/items/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!res.ok) {
-      const msg = await res.text();
-      alert(msg);
+    try {
+      await apiRequestJson<void>(`/api/items/${id}`, {
+        method: "DELETE",
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
       return;
     }
 
@@ -235,6 +237,13 @@ export default function ItemsPage() {
             )}
           </div>
         </div>
+
+        {loadError ? (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            โหลดรายการสินค้าไม่สำเร็จ
+            <div className="mt-1 break-words text-xs text-amber-700">{loadError}</div>
+          </div>
+        ) : null}
 
         {showForm ? (
           <div className="mt-5 rounded-[24px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5">
