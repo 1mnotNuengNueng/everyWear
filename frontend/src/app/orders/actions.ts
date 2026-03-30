@@ -55,9 +55,13 @@ function getValidatedPayload(formData: FormData) {
 
   for (const line of items) {
     const itemId = Number(line?.itemId);
+    const size = typeof line?.size === "string" ? line.size.trim() : "";
     const quantity = Number(line?.quantity);
     if (!Number.isFinite(itemId) || itemId <= 0) {
       throw new Error("กรุณาเลือกสินค้าให้ครบถ้วนก่อนบันทึก");
+    }
+    if (!size) {
+      throw new Error("กรุณาเลือกไซส์สินค้าให้ครบถ้วนก่อนบันทึก");
     }
     if (!Number.isFinite(quantity) || quantity < 1) {
       throw new Error("กรุณากรอกจำนวนสินค้าให้ถูกต้องก่อนบันทึก");

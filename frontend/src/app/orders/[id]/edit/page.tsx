@@ -22,12 +22,13 @@ type OrderDetail = {
   couponId: number | null;
   couponCode: string | null;
   orderDate: string | null;
-  items: Array<{
-    itemId: number | null;
-    quantity: number;
-    unitPrice: string | number | null;
-  }>;
-};
+	  items: Array<{
+	    itemId: number | null;
+	    size: string | null;
+	    quantity: number;
+	    unitPrice: string | number | null;
+	  }>;
+	};
 
 export default async function EditOrderPage({
   params,

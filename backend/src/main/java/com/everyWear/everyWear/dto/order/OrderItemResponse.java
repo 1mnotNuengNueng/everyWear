@@ -6,6 +6,7 @@ public class OrderItemResponse {
 
 	private Integer itemId;
 	private String itemName;
+	private String size;
 	private Integer quantity;
 	private BigDecimal unitPrice;
 	private BigDecimal lineTotal;
@@ -24,6 +25,14 @@ public class OrderItemResponse {
 
 	public void setItemName(String itemName) {
 		this.itemName = itemName;
+	}
+
+	public String getSize() {
+		return size;
+	}
+
+	public void setSize(String size) {
+		this.size = size;
 	}
 
 	public Integer getQuantity() {

@@ -36,14 +36,24 @@ type PromotionApiResponse = {
 };
 
 type InitialOrder = {
+	  id: number;
+	  couponId: number | null;
+	  couponCode: string | null;
+	  items: Array<{
+	    itemId: number | null;
+	    size?: string | null;
+	    quantity: number;
+	    unitPrice: string | number | null;
+	  }>;
+	};
+
+type StockApiResponse = {
   id: number;
-  couponId: number | null;
-  couponCode: string | null;
-  items: Array<{
-    itemId: number | null;
-    quantity: number;
-    unitPrice: string | number | null;
-  }>;
+  size: string;
+  itemId: number | null;
+  itemName: string | null;
+  quantity: number | null;
+  updatedAt: string | null;
 };
 
 type RewardCouponResponse = {
@@ -58,6 +68,7 @@ type RewardCouponResponse = {
 
 type OrderLine = {
   itemId: number | "";
+  size: string;
   quantity: number;
 };
 
@@ -166,31 +177,37 @@ export default function OrderUpsertForm(props: {
     promotion: PromotionApiResponse;
   } | null>(null);
 
+  const [stockByItemId, setStockByItemId] = useState<
+    Record<number, StockApiResponse[]>
+  >({});
+
   const [lines, setLines] = useState<OrderLine[]>(() => {
     const initialLines = props.initial?.items ?? [];
     if (initialLines.length === 0) {
-      return [{ itemId: "", quantity: 1 }];
+      return [{ itemId: "", size: "", quantity: 1 }];
     }
 
-    return initialLines.map((line) => ({
-      itemId: line.itemId ?? "",
-      quantity: line.quantity ?? 1,
-    }));
-  });
+	    return initialLines.map((line) => ({
+	      itemId: line.itemId ?? "",
+	      size: (line.size ?? "").trim(),
+	      quantity: line.quantity ?? 1,
+	    }));
+	  });
 
   const normalizedCouponCode = useMemo(() => {
     return couponCode.trim().toUpperCase();
   }, [couponCode]);
 
   const payloadJson = useMemo(() => {
-    const normalizedItems = lines
-      .filter((line) => line.itemId !== "")
-      .map((line) => {
-        return {
-          itemId: Number(line.itemId),
-          quantity: Number(line.quantity),
-        };
-      });
+	    const normalizedItems = lines
+	      .filter((line) => line.itemId !== "")
+	      .map((line) => {
+	        return {
+	          itemId: Number(line.itemId),
+	          size: line.size.trim(),
+	          quantity: Number(line.quantity),
+	        };
+	      });
 
     if (props.mode === "edit") {
       return JSON.stringify({
@@ -221,8 +238,85 @@ export default function OrderUpsertForm(props: {
     const allQuantitiesValid = lines
       .filter((line) => line.itemId !== "")
       .every((line) => Number.isFinite(line.quantity) && line.quantity >= 1);
-    return hasAtLeastOneItem && allQuantitiesValid;
-  }, [lines]);
+
+    const allSizesSelected = lines
+      .filter((line) => line.itemId !== "")
+      .every((line) => line.size.trim() !== "");
+
+    const allStockEnough = lines
+      .filter((line) => line.itemId !== "")
+      .every((line) => {
+        const itemId = Number(line.itemId);
+        if (!Number.isFinite(itemId)) return false;
+        const size = line.size.trim();
+        if (!size) return false;
+        const stocks = stockByItemId[itemId] ?? null;
+        if (!stocks) return false;
+        const stock = stocks.find((s) => (s.size ?? "").trim() === size) ?? null;
+        const qty = stock?.quantity ?? null;
+        if (qty === null || qty === undefined) return false;
+        return qty >= Number(line.quantity);
+      });
+
+    return hasAtLeastOneItem && allQuantitiesValid && allSizesSelected && allStockEnough;
+  }, [lines, stockByItemId]);
+
+  const validationMessage = useMemo(() => {
+    const selectedLines = lines.filter((line) => line.itemId !== "");
+    if (selectedLines.length === 0) {
+      return "กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนบันทึก";
+    }
+
+    for (const line of selectedLines) {
+      if (!Number.isFinite(Number(line.quantity)) || Number(line.quantity) < 1) {
+        return "กรุณากรอกจำนวนสินค้าให้ถูกต้องก่อนบันทึก";
+      }
+      if (line.size.trim() === "") {
+        return "กรุณาเลือกไซส์สินค้าให้ครบถ้วนก่อนบันทึก";
+      }
+      const itemId = Number(line.itemId);
+      const stocks = stockByItemId[itemId] ?? null;
+      if (!stocks) {
+        return "กำลังโหลดสต๊อกสินค้า... กรุณารอสักครู่";
+      }
+      const stock =
+        stocks.find((s) => (s.size ?? "").trim() === line.size.trim()) ?? null;
+      const qty = stock?.quantity ?? null;
+      if (qty === null || qty === undefined) {
+        return "ไม่พบข้อมูลสต๊อกสำหรับไซส์ที่เลือก";
+      }
+      if (qty < Number(line.quantity)) {
+        return "สต๊อกสินค้าไม่พอสำหรับจำนวนที่เลือก";
+      }
+    }
+
+    return null;
+  }, [lines, stockByItemId]);
+
+  useEffect(() => {
+    const itemIds = new Set<number>();
+    for (const line of lines) {
+      if (line.itemId === "") continue;
+      const id = Number(line.itemId);
+      if (Number.isFinite(id)) itemIds.add(id);
+    }
+
+    const missing = Array.from(itemIds).filter((id) => stockByItemId[id] === undefined);
+    if (missing.length === 0) return;
+
+    for (const itemId of missing) {
+      void (async () => {
+        try {
+          const stocks = await localGetJson<StockApiResponse[]>(
+            `/api/stock/item/${encodeURIComponent(String(itemId))}`,
+          );
+          setStockByItemId((prev) => ({ ...prev, [itemId]: stocks }));
+        } catch {
+          setStockByItemId((prev) => ({ ...prev, [itemId]: [] }));
+        }
+      })();
+    }
+  }, [lines, stockByItemId]);
 
   const calculatedSubtotal = useMemo(() => {
     let total = 0;
@@ -509,7 +603,7 @@ export default function OrderUpsertForm(props: {
         }
         if (!isValid) {
           event.preventDefault();
-          setSubmitMessage("กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนบันทึก");
+          setSubmitMessage(validationMessage);
           return;
         }
         setSubmitMessage(null);
@@ -600,29 +694,31 @@ export default function OrderUpsertForm(props: {
       {/* ตารางเลือกสินค้า */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="grid grid-cols-12 gap-3 border-b border-gray-200 bg-gray-100 px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-600">
-          <div className="col-span-6">รายการสินค้า</div>
+          <div className="col-span-4">รายการสินค้า</div>
+          <div className="col-span-2">ไซส์</div>
           <div className="col-span-2 text-right">จำนวน</div>
           <div className="col-span-2 text-right">ราคาต่อชิ้น</div>
           <div className="col-span-2 text-right">จัดการ</div>
         </div>
 
         <div className="divide-y divide-gray-100">
-          {lines.map((line, index) => (
-            <div key={index} className="grid grid-cols-12 gap-3 px-4 py-4 items-center">
-              <div className="col-span-6">
-                <select
-                  value={line.itemId === "" ? "" : String(line.itemId)}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setLines((prev) => {
-                      const next = [...prev];
-                      const nextLine = { ...next[index] };
-                      nextLine.itemId = value === "" ? "" : Number(value);
-
-                      next[index] = nextLine;
-                      return next;
-                    });
-                  }}
+	          {lines.map((line, index) => (
+	            <div key={index} className="grid grid-cols-12 gap-3 px-4 py-4 items-center">
+	              <div className="col-span-4">
+	                <select
+	                  value={line.itemId === "" ? "" : String(line.itemId)}
+	                  onChange={(event) => {
+	                    const value = event.target.value;
+	                    setLines((prev) => {
+	                      const next = [...prev];
+	                      const nextLine = { ...next[index] };
+	                      nextLine.itemId = value === "" ? "" : Number(value);
+	                      nextLine.size = "";
+	
+	                      next[index] = nextLine;
+	                      return next;
+	                    });
+	                  }}
                   className="h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500"
                 >
                   <option value="">-- เลือกสินค้า --</option>
@@ -631,8 +727,84 @@ export default function OrderUpsertForm(props: {
                       {item.name} - {formatMoney(item.price)}
                     </option>
                   ))}
-                </select>
-              </div>
+	                </select>
+	              </div>
+
+	              <div className="col-span-2">
+	                <div className="grid gap-1">
+	                  <select
+	                    value={line.size}
+	                    onChange={(event) => {
+	                      const value = event.target.value;
+	                      setLines((prev) => {
+	                        const next = [...prev];
+	                        next[index] = { ...next[index], size: value };
+	                        return next;
+	                      });
+	                    }}
+	                    disabled={line.itemId === ""}
+	                    className="h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+	                  >
+	                    {(() => {
+	                      if (line.itemId === "") {
+	                        return <option value="">-- เลือกสินค้า --</option>;
+	                      }
+
+	                      const itemId = Number(line.itemId);
+	                      const stocks = stockByItemId[itemId];
+	                      if (stocks === undefined) {
+	                        return <option value="">กำลังโหลด...</option>;
+	                      }
+
+	                      if (stocks.length === 0) {
+	                        return <option value="">ไม่มีไซส์/สต๊อก</option>;
+	                      }
+
+	                      return <option value="">-- เลือกไซส์ --</option>;
+	                    })()}
+
+	                    {(() => {
+	                      if (line.itemId === "") return null;
+	                      const itemId = Number(line.itemId);
+	                      const stocks = stockByItemId[itemId] ?? [];
+	                      return stocks.map((stock) => {
+	                        const qty = stock.quantity ?? 0;
+	                        return (
+	                          <option
+	                            key={stock.id}
+	                            value={stock.size}
+	                            disabled={qty <= 0}
+	                          >
+	                            {stock.size}
+	                            {stock.quantity === null || stock.quantity === undefined
+	                              ? ""
+	                              : ` (เหลือ ${stock.quantity})`}
+	                          </option>
+	                        );
+	                      });
+	                    })()}
+	                  </select>
+
+	                  {(() => {
+	                    if (line.itemId === "" || line.size.trim() === "") return null;
+	                    const itemId = Number(line.itemId);
+	                    const stocks = stockByItemId[itemId];
+	                    if (!stocks || stocks.length === 0) return null;
+	                    const stock =
+	                      stocks.find(
+	                        (s) => (s.size ?? "").trim() === line.size.trim(),
+	                      ) ?? null;
+	                    const qty = stock?.quantity ?? null;
+	                    if (qty === null || qty === undefined) return null;
+	                    if (qty >= Number(line.quantity)) return null;
+	                    return (
+	                      <div className="text-xs font-bold text-red-600">
+	                        สต๊อกไม่พอ (เหลือ {qty})
+	                      </div>
+	                    );
+	                  })()}
+	                </div>
+	              </div>
 
               <div className="col-span-2">
                 <input
@@ -698,7 +870,7 @@ export default function OrderUpsertForm(props: {
           <button
             type="button"
             onClick={() =>
-              setLines((prev) => [...prev, { itemId: "", quantity: 1 }])
+              setLines((prev) => [...prev, { itemId: "", size: "", quantity: 1 }])
             }
             className="h-10 rounded bg-blue-100 text-blue-700 px-4 text-sm font-bold hover:bg-blue-200 transition"
           >
