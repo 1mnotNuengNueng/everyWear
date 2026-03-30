@@ -106,15 +106,9 @@ async function localGetJson<T>(path: string): Promise<T> {
 export default function OrderUpsertForm(props: {
   mode: "create" | "edit";
   items: ItemOption[];
-  coupons?: CouponApiResponse[];
   initial?: InitialOrder;
   action: (formData: FormData) => void | Promise<void>;
 }) {
-  const coupons = props.coupons ?? [];
-
-  const [couponId, setCouponId] = useState<number | "">(
-    props.initial?.couponId ?? "",
-  );
   const [couponCode, setCouponCode] = useState<string>(
     props.initial?.couponCode ?? "",
   );
@@ -146,11 +140,6 @@ export default function OrderUpsertForm(props: {
     return couponCode.trim().toUpperCase();
   }, [couponCode]);
 
-  const selectedCoupon = useMemo(() => {
-    if (couponId === "") return null;
-    return coupons.find((coupon) => coupon.id === couponId) ?? null;
-  }, [couponId, coupons]);
-
   const payloadJson = useMemo(() => {
     const normalizedItems = lines
       .filter((line) => line.itemId !== "")
@@ -161,10 +150,12 @@ export default function OrderUpsertForm(props: {
         };
       });
 
+    const resolvedCouponId = couponCheckResult?.coupon.id ?? null;
+
     return JSON.stringify({
-      couponId: couponId === "" ? null : Number(couponId),
+      couponId: resolvedCouponId,
       couponCode:
-        couponId !== ""
+        resolvedCouponId !== null
           ? null
           : normalizedCouponCode !== ""
             ? normalizedCouponCode
@@ -172,7 +163,7 @@ export default function OrderUpsertForm(props: {
       orderDate: null,
       items: normalizedItems,
     });
-  }, [couponId, normalizedCouponCode, lines]);
+  }, [couponCheckResult, normalizedCouponCode, lines]);
 
   const isValid = useMemo(() => {
     const hasAtLeastOneItem = lines.some((line) => line.itemId !== "");
@@ -204,7 +195,7 @@ export default function OrderUpsertForm(props: {
   }, [lines, props.items]);
 
   const discountInfo = useMemo(() => {
-    const coupon = couponCheckResult?.coupon ?? selectedCoupon;
+    const coupon = couponCheckResult?.coupon ?? null;
     const promotion = couponCheckResult?.promotion ?? null;
 
     if (!coupon) {
@@ -270,7 +261,7 @@ export default function OrderUpsertForm(props: {
       hasCategoryLimit: allowedCategoryIds !== null,
       allowedCategoryIds,
     };
-  }, [calculatedSubtotal, couponCheckResult, lines, props.items, selectedCoupon]);
+  }, [calculatedSubtotal, couponCheckResult, lines, props.items]);
 
   const couponIssues = useMemo(() => {
     if (!discountInfo.allowedCategoryIds) return [];
@@ -406,17 +397,16 @@ export default function OrderUpsertForm(props: {
 	              setCouponCheckResult(null);
 	              setCouponCheckTone("info");
 	              setCouponCheckMessage(null);
-	            }}
+            }}
             placeholder="เช่น WELCOME100"
-            disabled={couponId !== ""}
-	            className="h-10 flex-1 rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+            className="h-10 flex-1 rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
           />
 	          <button
-	            type="button"
-	            onClick={handleCheckCoupon}
-	            disabled={couponId !== "" || couponCheckLoading || normalizedCouponCode === ""}
-	            className="h-10 shrink-0 whitespace-nowrap rounded bg-amber-500 px-6 text-sm font-bold text-white hover:bg-amber-600 transition disabled:bg-gray-300 disabled:text-gray-600 disabled:cursor-not-allowed"
-	          >
+            type="button"
+            onClick={handleCheckCoupon}
+            disabled={couponCheckLoading || normalizedCouponCode === ""}
+            className="h-10 shrink-0 whitespace-nowrap rounded bg-amber-500 px-6 text-sm font-bold text-white hover:bg-amber-600 transition disabled:bg-gray-300 disabled:text-gray-600 disabled:cursor-not-allowed"
+          >
 	            {couponCheckLoading ? "กำลังตรวจสอบ..." : "ตรวจสอบคูปอง"}
 	          </button>
 	        </div>
