@@ -17,14 +17,6 @@ type ItemOption = {
   categoryName: string | null;
 };
 
-type CouponOption = {
-  id: number;
-  code: string;
-  discountValue: string | number | null;
-  promotionName: string;
-  allowedCategoryIds?: number[] | null;
-};
-
 type OrderDetail = {
   id: number;
   couponId: number | null;
@@ -46,9 +38,9 @@ export default async function EditOrderPage({
   const orderId = Number(id);
   if (!Number.isFinite(orderId)) notFound();
 
-  const [items, coupons, order] = await Promise.all([
+  const [items, order] = await Promise.all([
+    // NOTE: Depends on backend Items API (friend-owned): GET /api/items
     apiGetJson<ItemOption[]>("/api/items"),
-    apiGetJson<CouponOption[]>("/api/coupons"),
     (async () => {
       const response = await apiGet(`/api/orders/${orderId}`);
       if (response.status === 404) notFound();
@@ -82,7 +74,6 @@ export default async function EditOrderPage({
         <OrderUpsertForm
           mode="edit"
           items={items}
-          coupons={coupons}
           initial={order}
           action={updateOrderAction.bind(null, orderId)}
         />
