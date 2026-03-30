@@ -18,7 +18,7 @@ export default function Home() {
         ยินดีต้อนรับสู่ everyWear POS
       </h2>
       <p className="text-slate-500 mt-2 font-medium">
-        ระบบจัดการหลังบ้านครบวงจรสำหรับร้านค้าคุณ
+        ระบบจัดการหลังบ้านครบวงจรสำหรับeveryWear
       </p>
 
       {/* Grid ของปุ่มเมนูทางลัด */}
