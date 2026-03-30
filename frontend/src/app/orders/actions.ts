@@ -1,12 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-
 import { apiUrl } from "@/lib/api";
 
+// ฟังก์ชัน generic สำหรับส่ง request ไป backend
 async function backendJsonRequest<TResponse>(
   path: string,
-  init: Omit<RequestInit, "body"> & { body?: unknown },
+  init: Omit<RequestInit, "body"> & { body?: string }, // body เป็น string
 ): Promise<TResponse> {
   const url = apiUrl(path);
   const response = await fetch(url, {
@@ -15,7 +15,7 @@ async function backendJsonRequest<TResponse>(
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: init.body, // รับ string ตรง ๆ
     cache: "no-store",
   });
 
@@ -33,33 +33,37 @@ async function backendJsonRequest<TResponse>(
   return (await response.json()) as TResponse;
 }
 
+// สร้าง order
 export async function createOrderAction(formData: FormData) {
   const payloadText = String(formData.get("payload") ?? "{}");
-  const payload = JSON.parse(payloadText) as unknown;
+  const payload = JSON.parse(payloadText);
 
   const result = await backendJsonRequest<{ id: number }>("/api/orders", {
     method: "POST",
-    body: payload,
+    body: JSON.stringify(payload), // แปลง object → string
   });
 
   redirect(`/orders/${result.id}`);
 }
 
+// อัปเดต order
 export async function updateOrderAction(orderId: number, formData: FormData) {
   const payloadText = String(formData.get("payload") ?? "{}");
-  const payload = JSON.parse(payloadText) as unknown;
+  const payload = JSON.parse(payloadText);
 
   const result = await backendJsonRequest<{ id: number }>(`/api/orders/${orderId}`, {
     method: "PUT",
-    body: payload,
+    body: JSON.stringify(payload), // แปลง object → string
   });
 
   redirect(`/orders/${result.id}`);
 }
 
-export async function deleteOrderAction(orderId: number, redirectTo?: string) {
+// ลบ order
+export async function deleteOrderAction(orderId: number, _formData: FormData) {
   const cancelPath = `/api/orders/${orderId}/cancel`;
   const cancelUrl = apiUrl(cancelPath);
+
   const cancelResponse = await fetch(cancelUrl, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -68,7 +72,7 @@ export async function deleteOrderAction(orderId: number, redirectTo?: string) {
 
   if (!cancelResponse.ok) {
     if (cancelResponse.status === 404 || cancelResponse.status === 405) {
-      await backendJsonRequest<void>(`/api/orders/${orderId}`, { method: "DELETE" });
+      await backendJsonRequest<void>(`/api/orders/${orderId}`, { method: "DELETE", body: undefined });
     } else {
       const text = await cancelResponse.text().catch(() => "");
       throw new Error(
@@ -77,5 +81,5 @@ export async function deleteOrderAction(orderId: number, redirectTo?: string) {
     }
   }
 
-  redirect(redirectTo ?? "/orders");
+  redirect("/orders");
 }
