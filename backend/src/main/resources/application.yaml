@@ -1,9 +1,12 @@
+server:
+  port: ${PORT:8080} # 👈 ให้ Railway กำหนด Port ให้ ถ้าไม่มี (รันในเครื่อง) จะใช้ 8080
+
 spring:
   application:    name: everyWear
   datasource:
-    url: jdbc:mysql://localhost:3306/everywear
-    username: root
-    password:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
