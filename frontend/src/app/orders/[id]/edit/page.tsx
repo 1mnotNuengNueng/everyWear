@@ -52,32 +52,35 @@ export default async function EditOrderPage({
   ]);
 
   return (
-    <div className="flex flex-col flex-1 bg-zinc-50 font-sans dark:bg-black">
-      <main className="w-full max-w-5xl flex-1 mx-auto px-6 py-10">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-              แก้ไขออเดอร์ #{order.id}
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              แก้ไขรายการสินค้า/คูปอง แล้วบันทึก
-            </p>
-          </div>
-          <Link
-            href={`/orders/${order.id}`}
-            className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500 dark:text-zinc-50"
-          >
-            กลับไปหน้ารายละเอียด
-          </Link>
+    <div className="h-full flex flex-col">
+      {/* ส่วนหัวของหน้า (Header) */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            ✏️ แก้ไขออเดอร์ #{order.id}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            ปรับปรุงรายการสินค้า คูปองส่วนลด แล้วกดบันทึกข้อมูล
+          </p>
         </div>
+        <Link
+          href={`/orders/${order.id}`}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm transition font-medium"
+        >
+          ยกเลิก
+        </Link>
+      </div>
 
+      {/* แบบฟอร์มแก้ไขออเดอร์ */}
+      {/* หมายเหตุ: ตัว <OrderUpsertForm> อาจจะมี Dark Mode ติดอยู่ในไฟล์ของมันเองด้วยนะครับ */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex-1 overflow-y-auto">
         <OrderUpsertForm
           mode="edit"
           items={items}
           initial={order}
           action={updateOrderAction.bind(null, orderId)}
         />
-      </main>
+      </div>
     </div>
   );
 }
