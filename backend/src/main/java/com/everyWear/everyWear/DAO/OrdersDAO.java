@@ -26,5 +26,18 @@ public interface OrdersDAO extends JpaRepository<Orders, Integer> {
 			order by o.createdAt desc
 			""")
 	List<Orders> findAllOrderByCreatedAtDesc();
+
+	@Query("""
+			select distinct o
+			from Orders o
+			left join fetch o.orderDetails od
+			left join fetch od.item i
+			left join fetch i.category c
+			left join fetch o.coupon co
+			left join fetch co.promotion p
+			left join fetch p.promotionCategories pc
+			left join fetch pc.category pcCat
+			""")
+	List<Orders> findAllWithDetails();
 }
 

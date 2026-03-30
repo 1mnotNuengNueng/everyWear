@@ -103,11 +103,11 @@ export default async function OrderDetailPage({
                 แก้ไข
               </Link>
             ) : null}
-            <form action={deleteOrderAction.bind(null, order.id)}>
-              <button
-                type="submit"
-                className="h-10 inline-flex items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={order.status === "CANCELLED"}
+	            <form action={deleteOrderAction.bind(null, order.id, `/orders/${order.id}`)}>
+	              <button
+	                type="submit"
+	                className="h-10 inline-flex items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+	                disabled={order.status === "CANCELLED"}
               >
                 ยกเลิกออเดอร์
               </button>
