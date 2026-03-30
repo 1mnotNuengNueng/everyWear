@@ -22,8 +22,6 @@ import com.everyWear.everyWear.service.CouponService;
 
 import jakarta.validation.Valid;
 
-<<<<<<< HEAD
-=======
 /**
  * NOTE: Friend-owned area (Coupons API) — waiting to be extended/maintained by the teammate responsible for Coupons.
  *
@@ -34,7 +32,7 @@ import jakarta.validation.Valid;
  * - PUT /api/coupons/{id} : update coupon
  * - DELETE /api/coupons/{id} : delete coupon
  */
->>>>>>> 7f7923f565874ced6b51b1c4c187dbddc7595d60
+
 @Validated
 @RestController
 @RequestMapping("/api/coupons")
