@@ -5,9 +5,9 @@ spring:
   application:
     name: everyWear
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASS}
+    url: jdbc:mysql://everywear-database-pollux11011.g.aivencloud.com:28617/defaultdb?sslMode=REQUIRED
+    username: avnadmin
+    password: 
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:

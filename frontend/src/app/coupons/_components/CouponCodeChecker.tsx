@@ -2,24 +2,20 @@
 
 import { useState, useTransition } from "react";
 
-import { apiRequestJson } from "@/lib/api";
-
-type CouponValidationResponse = {
-  coupon: {
-    id: number;
-    code: string;
-    expireDate: string | null;
-    active: boolean;
-    createdAt: string | null;
-    promotionId: number;
-    promotionName: string;
-    discountValue: string | number | null;
-    allowedCategoryIds?: number[] | null;
-  };
-  categories: Array<{
+type CouponLookupResponse = {
+  id: number;
+  code: string;
+  expireDate: string | null;
+  active: boolean;
+  createdAt: string | null;
+  promotionId: number;
+  promotionName: string;
+  discountValue: string | number | null;
+  allowedCategoryIds?: number[] | null;
+  allowedCategories?: Array<{
     id: number;
     name: string;
-  }>;
+  }> | null;
 };
 
 function formatDateTime(value: string | null) {
@@ -33,19 +29,31 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
-function formatMoney(value: string | number | null) {
+function formatPercent(value: string | number | null) {
   if (value === null || value === undefined) return "-";
-  const numberValue = typeof value === "string" ? Number(value) : value;
-  if (Number.isNaN(numberValue)) return String(value);
-  return new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-  }).format(numberValue);
+  const numericValue = typeof value === "string" ? Number(value) : value;
+  if (Number.isNaN(numericValue)) return String(value);
+  return `${numericValue}%`;
+}
+
+async function getCouponByCode(code: string) {
+  const response = await fetch(`/api/coupons/code/${encodeURIComponent(code)}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      text || `Request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return (await response.json()) as CouponLookupResponse;
 }
 
 export default function CouponCodeChecker() {
   const [code, setCode] = useState("");
-  const [result, setResult] = useState<CouponValidationResponse | null>(null);
+  const [result, setResult] = useState<CouponLookupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -55,22 +63,20 @@ export default function CouponCodeChecker() {
     startTransition(async () => {
       try {
         setError(null);
-        const response = await apiRequestJson<CouponValidationResponse>(
-          "/api/coupons/validate",
-          {
-            method: "POST",
-            body: { code },
-          },
-        );
+        const response = await getCouponByCode(code.trim());
         setResult(response);
       } catch (submitError) {
         const message =
-          submitError instanceof Error ? submitError.message : "ไม่สามารถตรวจสอบคูปองได้";
+          submitError instanceof Error
+            ? submitError.message
+            : "ไม่สามารถตรวจสอบคูปองได้";
         setResult(null);
         setError(message);
       }
     });
   }
+
+  const allowedCategories = result?.allowedCategories ?? [];
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -109,31 +115,29 @@ export default function CouponCodeChecker() {
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="rounded-2xl bg-amber-50 p-4">
             <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-xl font-semibold text-stone-900">
-                {result.coupon.code}
-              </h3>
+              <h3 className="text-xl font-semibold text-stone-900">{result.code}</h3>
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  result.coupon.active
+                  result.active
                     ? "bg-emerald-100 text-emerald-700"
-                    : "bg-stone-200 text-stone-700"
+                    : "bg-amber-100 text-amber-700"
                 }`}
               >
-                {result.coupon.active ? "ACTIVE" : "INACTIVE"}
+                {result.active ? "ยังไม่ถูกใช้" : "ถูกใช้แล้ว"}
               </span>
             </div>
             <div className="mt-3 grid gap-2 text-sm text-stone-700">
-              <div>โปรโมชั่น: {result.coupon.promotionName}</div>
-              <div>ส่วนลด: {formatMoney(result.coupon.discountValue)}</div>
-              <div>หมดอายุ: {formatDateTime(result.coupon.expireDate)}</div>
+              <div>โปรโมชั่น: {result.promotionName}</div>
+              <div>ส่วนลด: {formatPercent(result.discountValue)}</div>
+              <div>หมดอายุ: {formatDateTime(result.expireDate)}</div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
             <div className="text-sm font-medium text-stone-900">หมวดหมู่ที่ร่วมรายการ</div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {result.categories.length > 0 ? (
-                result.categories.map((category) => (
+              {allowedCategories.length > 0 ? (
+                allowedCategories.map((category) => (
                   <span
                     key={category.id}
                     className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700 shadow-sm"

@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.everyWear.everyWear.dto.coupon.CouponRequest;
 import com.everyWear.everyWear.dto.coupon.CouponResponse;
+import com.everyWear.everyWear.dto.coupon.CouponCodeValidationRequest;
 import com.everyWear.everyWear.dto.coupon.CouponStatusUpdateRequest;
+import com.everyWear.everyWear.dto.coupon.CouponValidationResponse;
 import com.everyWear.everyWear.service.CouponService;
 
 import jakarta.validation.Valid;
@@ -62,6 +64,12 @@ public class CouponController {
 	@GetMapping("/code/{code}")
 	public ResponseEntity<CouponResponse> getCouponByCode(@PathVariable String code) {
 		return ResponseEntity.ok(couponService.getCouponByCode(code));
+	}
+
+	@PostMapping("/validate")
+	public ResponseEntity<CouponValidationResponse> validateCouponCode(
+			@Valid @RequestBody CouponCodeValidationRequest request) {
+		return ResponseEntity.ok(couponService.validateCouponCode(request));
 	}
 
 	@PutMapping("/{id}")

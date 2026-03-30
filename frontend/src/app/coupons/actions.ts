@@ -28,15 +28,6 @@ export async function updateCouponAction(couponId: number, formData: FormData) {
   redirect("/coupons");
 }
 
-export async function updateCouponStatusAction(couponId: number, isActive: boolean) {
-  await apiRequestJson(`/api/coupons/${couponId}/status`, {
-    method: "PATCH",
-    body: { isActive },
-  });
-
-  redirect("/coupons");
-}
-
 export async function deleteCouponAction(couponId: number) {
   await apiRequestJson(`/api/coupons/${couponId}`, {
     method: "DELETE",
