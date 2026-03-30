@@ -5,68 +5,83 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.everyWear.everyWear.DAO.CategoryDAO;
 import com.everyWear.everyWear.DAO.ItemDAO;
 import com.everyWear.everyWear.dto.item.ItemSummaryResponse;
 import com.everyWear.everyWear.model.Item;
 
-/**
- * NOTE: Friend-owned area (Items API) — waiting to be extended/maintained by the teammate responsible for Items.
- *
- * Endpoints:
- * - GET /api/items : list items (id/name/price/category)
- */
 @RestController
 @RequestMapping("/api/items")
+@CrossOrigin(origins = "http://localhost:3000")
 public class ItemController {
 
     private final ItemDAO itemDAO;
+    private final CategoryDAO categoryDAO;
 
-    public ItemController(ItemDAO itemDAO) {
+    public ItemController(ItemDAO itemDAO, CategoryDAO categoryDAO) {
         this.itemDAO = itemDAO;
+        this.categoryDAO = categoryDAO;
     }
 
     @GetMapping
     public ResponseEntity<List<ItemSummaryResponse>> getAllItems() {
-        List<ItemSummaryResponse> items = itemDAO.findAll()
+        List<ItemSummaryResponse> items = itemDAO.findByIsActiveTrue()
                 .stream()
                 .map(item -> {
-                    ItemSummaryResponse response = new ItemSummaryResponse();
-                    response.setId(item.getId());
-                    response.setName(item.getName());
-                    response.setPrice(item.getPrice());
+                    ItemSummaryResponse res = new ItemSummaryResponse();
+                    res.setId(item.getId());
+                    res.setName(item.getName());
+                    res.setPrice(item.getPrice());
+
                     if (item.getCategory() != null) {
-                        response.setCategoryId(item.getCategory().getId());
-                        response.setCategoryName(item.getCategory().getName());
+                        res.setCategoryId(item.getCategory().getId());
+                        res.setCategoryName(item.getCategory().getName());
                     }
-                    return response;
+
+                    return res;
                 })
                 .toList();
 
         return ResponseEntity.ok(items);
     }
 
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Item> getItemById(@PathVariable Integer id) {
-        return itemDAO.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
     @PostMapping
-    public Item createItem(@RequestBody Item item) {
-        return itemDAO.save(item);
+    public ResponseEntity<?> createItem(@RequestBody Item item) {
+
+        if (item.getCategory() == null) {
+            return ResponseEntity.badRequest().body("ต้องเลือกหมวดหมู่");
+        }
+
+        if (!categoryDAO.existsById(item.getCategory().getId())) {
+            return ResponseEntity.badRequest().body("หมวดหมู่ไม่ถูกต้อง");
+        }
+
+        if (item.getPrice().doubleValue() <= 0) {
+            return ResponseEntity.badRequest().body("ราคาต้องมากกว่า 0");
+        }
+
+        if (itemDAO.existsByName(item.getName())) {
+            return ResponseEntity.badRequest().body("ชื่อสินค้านี้มีแล้ว");
+        }
+
+        item.setIsActive(true);
+
+        return ResponseEntity.ok(itemDAO.save(item));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Item> updateItem(@PathVariable Integer id, @RequestBody Item newItem) {
+    public ResponseEntity<?> updateItem(@PathVariable Integer id, @RequestBody Item newItem) {
 
         return itemDAO.findById(id)
                 .map(item -> {
+
+                    if (newItem.getPrice().doubleValue() <= 0) {
+                        return ResponseEntity.badRequest().body("ราคาต้องมากกว่า 0");
+                    }
+
                     item.setName(newItem.getName());
                     item.setDescription(newItem.getDescription());
                     item.setPrice(newItem.getPrice());
-                    item.setIsActive(newItem.isIsActive());
                     item.setCategory(newItem.getCategory());
 
                     return ResponseEntity.ok(itemDAO.save(item));
@@ -74,14 +89,28 @@ public class ItemController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // ✅ Soft Delete
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteItem(@PathVariable Integer id) {
 
         return itemDAO.findById(id)
                 .map(item -> {
-                    itemDAO.delete(item);
+                    item.setIsActive(false);
+                    itemDAO.save(item);
                     return ResponseEntity.ok().build();
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    // 🔍 search name
+    @GetMapping("/search")
+    public List<Item> search(@RequestParam String name) {
+        return itemDAO.findByNameContainingIgnoreCaseAndIsActiveTrue(name);
+    }
+
+    // 🔍 filter category
+    @GetMapping("/category/{id}")
+    public List<Item> byCategory(@PathVariable Integer id) {
+        return itemDAO.findByCategory_IdAndIsActiveTrue(id);
     }
 }
