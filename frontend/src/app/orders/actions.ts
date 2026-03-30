@@ -1,0 +1,63 @@
+"use server";
+
+import { redirect } from "next/navigation";
+
+import { apiUrl } from "@/lib/api";
+
+async function backendJsonRequest<TResponse>(
+  path: string,
+  init: RequestInit & { body?: unknown },
+): Promise<TResponse> {
+  const url = apiUrl(path);
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Backend request failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return (await response.json()) as TResponse;
+}
+
+export async function createOrderAction(formData: FormData) {
+  const payloadText = String(formData.get("payload") ?? "{}");
+  const payload = JSON.parse(payloadText) as unknown;
+
+  const result = await backendJsonRequest<{ id: number }>("/api/orders", {
+    method: "POST",
+    body: payload,
+  });
+
+  redirect(`/orders/${result.id}`);
+}
+
+export async function updateOrderAction(orderId: number, formData: FormData) {
+  const payloadText = String(formData.get("payload") ?? "{}");
+  const payload = JSON.parse(payloadText) as unknown;
+
+  const result = await backendJsonRequest<{ id: number }>(`/api/orders/${orderId}`, {
+    method: "PUT",
+    body: payload,
+  });
+
+  redirect(`/orders/${result.id}`);
+}
+
+export async function deleteOrderAction(orderId: number) {
+  await backendJsonRequest<void>(`/api/orders/${orderId}`, { method: "DELETE" });
+  redirect(`/orders/${orderId}`);
+}
