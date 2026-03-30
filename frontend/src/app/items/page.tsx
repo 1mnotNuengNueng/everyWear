@@ -186,7 +186,7 @@ export default function ItemsPage() {
         <div className="relative mt-6">
           <div className="max-w-xs rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-100">
-              สินค้าทั้งหมด
+              รายการสินค้าทั้งหมด
             </p>
             <p className="mt-2 text-3xl font-black">{items.length}</p>
           </div>
