@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache"; // 👈 1. Import ตัวนี้เข้ามา
 import { redirect } from "next/navigation";
 import { apiUrl } from "@/lib/api";
 
@@ -107,10 +106,6 @@ export async function updateOrderAction(orderId: number, formData: FormData) {
     body: JSON.stringify(payload), // แปลง object → string
   });
 
-  // 👈 3. ล้าง Cache ของหน้ารวม และ หน้ารายละเอียดออเดอร์นั้นๆ
-  revalidatePath("/orders");
-  revalidatePath(`/orders/${orderId}`);
-  
   redirect(`/orders/${result.id}`);
 }
 
