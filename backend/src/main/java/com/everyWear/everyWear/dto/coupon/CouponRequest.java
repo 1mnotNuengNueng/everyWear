@@ -3,7 +3,6 @@ package com.everyWear.everyWear.dto.coupon;
 import java.time.LocalDateTime;
 
 import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -12,7 +11,6 @@ public class CouponRequest {
 	@NotNull(message = "promotionId is required")
 	private Integer promotionId;
 
-	@NotBlank(message = "code is required")
 	@Size(max = 50, message = "code must not exceed 50 characters")
 	private String code;
 
