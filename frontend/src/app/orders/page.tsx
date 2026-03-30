@@ -35,13 +35,7 @@ function formatMoney(value: string | number | null) {
 
 export default async function OrdersPage() {
   // ดึงข้อมูลจาก API
-  let orders: OrderSummary[] = [];
-  let backendError: string | null = null;
-  try {
-    orders = await apiGetJson<OrderSummary[]>("/api/orders");
-  } catch (error) {
-    backendError = error instanceof Error ? error.message : String(error);
-  }
+  const orders = await apiGetJson<OrderSummary[]>("/api/orders");
 
   return (
     <div className="h-full flex flex-col">
@@ -66,15 +60,6 @@ export default async function OrdersPage() {
       </div>
 
       {/* ส่วนตารางรายการออเดอร์ */}
-      {backendError ? (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <div className="font-bold">เชื่อมต่อ Backend ไม่สำเร็จ</div>
-          <div className="mt-1 break-words text-xs text-amber-800">
-            {backendError}
-          </div>
-        </div>
-      ) : null}
-
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
         {/* หัวตาราง */}
         <div className="grid grid-cols-12 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500">
