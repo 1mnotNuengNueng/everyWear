@@ -393,43 +393,10 @@ export default function OrderUpsertForm(props: {
       action={props.action}
       className="mt-8 grid gap-6"
     >
-      <input type="hidden" name="payload" value={payloadJson} />
-
-      {/* กล่องเลือกคูปอง */}
-      <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm">
-            <span className="font-bold text-gray-800">
-              🏷️ เลือกคูปองส่วนลด
-            </span>
-            <select
-              value={couponId === "" ? "" : String(couponId)}
-	              onChange={(event) => {
-	                const value = event.target.value;
-	                setCouponId(value === "" ? "" : Number(value));
-	                setCouponCheckResult(null);
-	                setCouponCheckTone("info");
-	                setCouponCheckMessage(null);
-	                if (value !== "") {
-	                  setCouponCode("");
-	                }
-	              }}
-              className="h-10 rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500"
-            >
-              <option value="">ไม่ใช้คูปอง</option>
-              {coupons.map((coupon) => (
-                <option key={coupon.id} value={coupon.id}>
-                  {coupon.code} ({coupon.promotionName}) -{" "}
-                  {formatMoney(coupon.discountValue)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
+  
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-gray-700">
-            หรือกรอกโค้ดคูปองด้วยตัวเอง
+            กรอกโค้ดคูปอง
           </span>
           <div className="flex items-center gap-2">
           <input
@@ -468,9 +435,7 @@ export default function OrderUpsertForm(props: {
 	            {couponCheckMessage}
 	          </div>
 	        ) : null}
-          <div className="text-xs text-gray-500">
-            * ถ้าเลือกคูปองจากรายการด้านบนแล้ว ช่องนี้จะถูกล็อก
-          </div>
+        
         </label>
 
         {couponIssues.length > 0 ? (
@@ -485,7 +450,7 @@ export default function OrderUpsertForm(props: {
             </ul>
           </div>
         ) : null}
-      </div>
+    
 
       {/* ตารางเลือกสินค้า */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -592,7 +557,7 @@ export default function OrderUpsertForm(props: {
             }
             className="h-10 rounded bg-blue-100 text-blue-700 px-4 text-sm font-bold hover:bg-blue-200 transition"
           >
-            + เพิ่มบรรทัดสินค้า
+            + เพิ่มสินค้า
           </button>
         </div>
       </div>
