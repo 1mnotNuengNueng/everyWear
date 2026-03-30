@@ -16,6 +16,12 @@ type PromotionOption = {
   startAt: string | null;
   endAt: string | null;
   categoryIds?: number[] | null;
+  categories?: Array<{ id: number; name: string }> | null;
+};
+
+type CategoryOption = {
+  id: number;
+  name: string;
 };
 
 type CouponDetail = {
@@ -35,8 +41,9 @@ export default async function EditCouponPage({
   const couponId = Number(id);
   if (!Number.isFinite(couponId)) notFound();
 
-  const [promotions, coupon] = await Promise.all([
+  const [promotions, categories, coupon] = await Promise.all([
     apiGetJson<PromotionOption[]>("/api/promotions"),
+    apiGetJson<CategoryOption[]>("/api/categories").catch(() => []),
     (async () => {
       const response = await apiGet(`/api/coupons/${couponId}`);
       if (response.status === 404) notFound();
@@ -70,6 +77,7 @@ export default async function EditCouponPage({
         <CouponUpsertForm
           mode="edit"
           promotions={promotions}
+          categories={categories}
           initial={{
             id: coupon.id,
             code: coupon.code,

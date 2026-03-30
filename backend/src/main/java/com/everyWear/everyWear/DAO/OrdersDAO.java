@@ -39,5 +39,13 @@ public interface OrdersDAO extends JpaRepository<Orders, Integer> {
 			left join fetch pc.category pcCat
 			""")
 	List<Orders> findAllWithDetails();
+
+	@Query("""
+			select o.id
+			from Orders o
+			where o.coupon.id = :couponId
+			order by o.createdAt desc
+			""")
+	List<Integer> findOrderIdsByCouponId(@Param("couponId") Integer couponId);
 }
 

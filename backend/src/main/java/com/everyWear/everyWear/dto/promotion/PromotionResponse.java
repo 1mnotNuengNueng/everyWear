@@ -3,6 +3,7 @@ package com.everyWear.everyWear.dto.promotion;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -23,10 +24,10 @@ public class PromotionResponse {
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
-    
-    private List<Integer> categoryIds;
 
-    // Getters and Setters
+    private List<Integer> categoryIds;
+    private List<PromotionCategorySummary> categories;
+
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
     public String getName() { return name; }
@@ -45,4 +46,6 @@ public class PromotionResponse {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public List<Integer> getCategoryIds() { return categoryIds; }
     public void setCategoryIds(List<Integer> categoryIds) { this.categoryIds = categoryIds; }
+    public List<PromotionCategorySummary> getCategories() { return categories; }
+    public void setCategories(List<PromotionCategorySummary> categories) { this.categories = categories; }
 }
