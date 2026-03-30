@@ -157,7 +157,7 @@ public class CouponService {
     }
 
     private String generateUniqueCouponCode() {
-        for (int attempt = 0; attempt < MAX_CODE_GENERATION_ATTEM রাশ; attempt++) {
+        for (int attempt = 0; attempt < MAX_CODE_GENERATION_ATTEMPTS; attempt++) {
             String code = randomCode();
             if (!couponDAO.existsByCode(code)) {
                 return code;
