@@ -10,6 +10,30 @@ type ItemOption = {
   categoryName: string | null;
 };
 
+type CouponApiResponse = {
+  id: number;
+  code: string;
+  expireDate: string | null;
+  active: boolean;
+  createdAt: string | null;
+  promotionId: number | null;
+  promotionName: string | null;
+  discountValue: string | number | null;
+  allowedCategoryIds?: number[] | null;
+};
+
+type PromotionApiResponse = {
+  id: number;
+  name: string;
+  description: string;
+  discountValue: string | number | null;
+  startAt: string | null;
+  endAt: string | null;
+  isActive: boolean;
+  createdAt: string | null;
+  categoryIds?: number[] | null;
+};
+
 type InitialOrder = {
   id: number;
   couponId: number | null;
@@ -36,6 +60,49 @@ function formatMoney(value: string | number | null) {
   }).format(numberValue);
 }
 
+function toNumber(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const numberValue = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(numberValue)) return null;
+  return numberValue;
+}
+
+function parseBackendDateTime(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.includes("T")) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (!match) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const [, year, month, day, hour, minute, second] = match;
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+async function localGetJson<T>(path: string): Promise<T> {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Request failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`,
+    );
+  }
+  return (await response.json()) as T;
+}
+
 export default function OrderUpsertForm(props: {
   mode: "create" | "edit";
   items: ItemOption[];
@@ -48,9 +115,14 @@ export default function OrderUpsertForm(props: {
   const [couponCheckMessage, setCouponCheckMessage] = useState<string | null>(
     null,
   );
+  const [couponCheckLoading, setCouponCheckLoading] = useState(false);
   const [couponCheckTone, setCouponCheckTone] = useState<
     "info" | "warning" | "error"
   >("info");
+  const [couponCheckResult, setCouponCheckResult] = useState<{
+    coupon: CouponApiResponse;
+    promotion: PromotionApiResponse;
+  } | null>(null);
 
   const [lines, setLines] = useState<OrderLine[]>(() => {
     const initialLines = props.initial?.items ?? [];
@@ -64,6 +136,10 @@ export default function OrderUpsertForm(props: {
     }));
   });
 
+  const normalizedCouponCode = useMemo(() => {
+    return couponCode.trim().toUpperCase();
+  }, [couponCode]);
+
   const payloadJson = useMemo(() => {
     const normalizedItems = lines
       .filter((line) => line.itemId !== "")
@@ -76,11 +152,11 @@ export default function OrderUpsertForm(props: {
 
     return JSON.stringify({
       couponId: null,
-      couponCode: couponCode.trim() !== "" ? couponCode.trim() : null,
+      couponCode: normalizedCouponCode !== "" ? normalizedCouponCode : null,
       orderDate: null,
       items: normalizedItems,
     });
-  }, [couponCode, lines]);
+  }, [normalizedCouponCode, lines]);
 
   const isValid = useMemo(() => {
     const hasAtLeastOneItem = lines.some((line) => line.itemId !== "");
@@ -111,6 +187,161 @@ export default function OrderUpsertForm(props: {
     return total;
   }, [lines, props.items]);
 
+  const discountInfo = useMemo(() => {
+    if (!couponCheckResult) {
+      return {
+        eligibleSubtotal: 0,
+        discountAmount: 0,
+        netValue: calculatedSubtotal,
+        discountPercent: null as number | null,
+        hasCategoryLimit: false,
+      };
+    }
+
+    const allowedCategoryIdsRaw =
+      (couponCheckResult.coupon.allowedCategoryIds ?? null) ??
+      (couponCheckResult.promotion.categoryIds ?? null);
+    const allowedCategoryIds =
+      Array.isArray(allowedCategoryIdsRaw) && allowedCategoryIdsRaw.length > 0
+        ? new Set(allowedCategoryIdsRaw)
+        : null;
+
+    let eligibleSubtotal = 0;
+    for (const line of lines) {
+      if (line.itemId === "") continue;
+      const qty = Number(line.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+
+      const item = props.items.find((it) => it.id === Number(line.itemId));
+      if (!item) continue;
+
+      if (allowedCategoryIds) {
+        const categoryId = item.categoryId ?? null;
+        if (categoryId === null || !allowedCategoryIds.has(categoryId)) {
+          continue;
+        }
+      }
+
+      const itemPrice =
+        item.price === null || item.price === undefined
+          ? null
+          : typeof item.price === "string"
+            ? Number(item.price)
+            : item.price;
+      if (itemPrice !== null && Number.isFinite(itemPrice)) {
+        eligibleSubtotal += itemPrice * qty;
+      }
+    }
+
+    const discountPercent =
+      toNumber(couponCheckResult.promotion.discountValue) ??
+      toNumber(couponCheckResult.coupon.discountValue);
+    const percent = discountPercent ?? 0;
+    const discountAmount =
+      percent <= 0
+        ? 0
+        : Math.min(eligibleSubtotal, (eligibleSubtotal * percent) / 100);
+    const netValue = Math.max(0, calculatedSubtotal - discountAmount);
+
+    return {
+      eligibleSubtotal,
+      discountAmount,
+      netValue,
+      discountPercent: discountPercent,
+      hasCategoryLimit: allowedCategoryIds !== null,
+    };
+  }, [calculatedSubtotal, couponCheckResult, lines, props.items]);
+
+  async function handleCheckCoupon() {
+    const normalized = normalizedCouponCode;
+    if (!normalized) {
+      setCouponCheckTone("error");
+      setCouponCheckMessage("กรุณากรอกโค้ดคูปองก่อนกดตรวจสอบ");
+      setCouponCheckResult(null);
+      return;
+    }
+
+    setCouponCheckLoading(true);
+    setCouponCheckTone("warning");
+    setCouponCheckMessage("กำลังตรวจสอบคูปองและโปรโมชัน...");
+    setCouponCheckResult(null);
+
+    try {
+      const coupon = await localGetJson<CouponApiResponse>(
+        `/api/coupons/code/${encodeURIComponent(normalized)}`,
+      );
+
+      if (!coupon.promotionId) {
+        setCouponCheckTone("error");
+        setCouponCheckMessage("คูปองนี้ไม่มีโปรโมชันผูกอยู่");
+        return;
+      }
+
+      const promotion = await localGetJson<PromotionApiResponse>(
+        `/api/promotions/${coupon.promotionId}`,
+      );
+
+      const now = new Date();
+      const issues: string[] = [];
+
+      if (!coupon.active) {
+        issues.push("คูปองถูกปิดใช้งาน");
+      }
+
+      const expireAt = parseBackendDateTime(coupon.expireDate);
+      if (expireAt && expireAt.getTime() <= now.getTime()) {
+        issues.push("คูปองหมดอายุแล้ว");
+      }
+
+      if (!promotion.isActive) {
+        issues.push("โปรโมชันถูกปิดใช้งาน");
+      }
+
+      const startAt = parseBackendDateTime(promotion.startAt);
+      if (startAt && startAt.getTime() > now.getTime()) {
+        issues.push("โปรโมชันยังไม่เริ่ม");
+      }
+
+      const endAt = parseBackendDateTime(promotion.endAt);
+      if (endAt && endAt.getTime() < now.getTime()) {
+        issues.push("โปรโมชันสิ้นสุดแล้ว");
+      }
+
+      if (issues.length > 0) {
+        setCouponCheckTone("error");
+        setCouponCheckMessage(issues.join(" • "));
+        return;
+      }
+
+      setCouponCheckResult({ coupon, promotion });
+      setCouponCheckTone("info");
+
+      const percent =
+        toNumber(promotion.discountValue) ?? toNumber(coupon.discountValue);
+      const percentText = percent === null ? "" : ` ลด ${percent}%`;
+      const categoryText =
+        coupon.allowedCategoryIds && coupon.allowedCategoryIds.length > 0
+          ? ` (เฉพาะหมวดหมู่ ${coupon.allowedCategoryIds.length} หมวด)`
+          : promotion.categoryIds && promotion.categoryIds.length > 0
+            ? ` (เฉพาะหมวดหมู่ ${promotion.categoryIds.length} หมวด)`
+            : "";
+      setCouponCheckMessage(
+        `ใช้ได้: ${coupon.code} — ${coupon.promotionName ?? promotion.name}${percentText}${categoryText}`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setCouponCheckTone("error");
+      setCouponCheckMessage(
+        message.toLowerCase().includes("404")
+          ? `ไม่พบคูปอง: ${normalized}`
+          : `ตรวจสอบไม่สำเร็จ: ${message}`,
+      );
+      setCouponCheckResult(null);
+    } finally {
+      setCouponCheckLoading(false);
+    }
+  }
+
   return (
     <form
       action={props.action}
@@ -129,27 +360,18 @@ export default function OrderUpsertForm(props: {
               onChange={(event) => {
                 setCouponCode(event.target.value);
                 setCouponCheckMessage(null);
+                setCouponCheckResult(null);
               }}
               placeholder="เช่น WELCOME100"
               className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
             />
             <button
               type="button"
-              onClick={() => {
-                const normalized = couponCode.trim();
-                if (!normalized) {
-                  setCouponCheckTone("error");
-                  setCouponCheckMessage("กรุณากรอกโค้ดคูปองก่อนกดตรวจสอบ");
-                  return;
-                }
-                setCouponCheckTone("warning");
-                setCouponCheckMessage(
-                  `ยังไม่เชื่อม API ตรวจสอบคูปอง (โค้ด: ${normalized})`,
-                );
-              }}
+              onClick={handleCheckCoupon}
               className="h-10 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900/40"
+              disabled={couponCheckLoading}
             >
-              ตรวจสอบ
+              {couponCheckLoading ? "กำลังตรวจสอบ..." : "ตรวจสอบ"}
             </button>
           </div>
         </label>
@@ -273,7 +495,9 @@ export default function OrderUpsertForm(props: {
             <span className="text-zinc-600 dark:text-zinc-400">
               ส่วนลด (ประมาณ)
             </span>
-            <span className="font-medium text-zinc-900 dark:text-zinc-50">-</span>
+            <span className="font-medium text-zinc-900 dark:text-zinc-50">
+              {couponCheckResult ? formatMoney(discountInfo.discountAmount) : "-"}
+            </span>
           </div>
           <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
             <div className="flex items-center justify-between">
@@ -281,7 +505,9 @@ export default function OrderUpsertForm(props: {
                 ราคาที่ลดแล้ว (ประมาณ)
               </span>
               <span className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                {formatMoney(calculatedSubtotal)}
+                {couponCheckResult
+                  ? formatMoney(discountInfo.netValue)
+                  : formatMoney(calculatedSubtotal)}
               </span>
             </div>
           </div>
