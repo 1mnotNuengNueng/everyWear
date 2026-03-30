@@ -2,16 +2,14 @@ server:
   port: 8080
 
 spring:
-  application:    
+  application:
     name: everyWear
-spring:
   datasource:
     url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
-    # 2. บังคับใส่ Dialect ไปเลยเพื่อป้องกัน Spring Boot เดาผิด
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
