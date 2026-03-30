@@ -106,9 +106,15 @@ async function localGetJson<T>(path: string): Promise<T> {
 export default function OrderUpsertForm(props: {
   mode: "create" | "edit";
   items: ItemOption[];
+  coupons?: CouponApiResponse[];
   initial?: InitialOrder;
   action: (formData: FormData) => void | Promise<void>;
 }) {
+  const coupons = props.coupons ?? [];
+
+  const [couponId, setCouponId] = useState<number | "">(
+    props.initial?.couponId ?? "",
+  );
   const [couponCode, setCouponCode] = useState<string>(
     props.initial?.couponCode ?? "",
   );
@@ -140,6 +146,11 @@ export default function OrderUpsertForm(props: {
     return couponCode.trim().toUpperCase();
   }, [couponCode]);
 
+  const selectedCoupon = useMemo(() => {
+    if (couponId === "") return null;
+    return coupons.find((coupon) => coupon.id === couponId) ?? null;
+  }, [couponId, coupons]);
+
   const payloadJson = useMemo(() => {
     const normalizedItems = lines
       .filter((line) => line.itemId !== "")
@@ -151,12 +162,17 @@ export default function OrderUpsertForm(props: {
       });
 
     return JSON.stringify({
-      couponId: null,
-      couponCode: normalizedCouponCode !== "" ? normalizedCouponCode : null,
+      couponId: couponId === "" ? null : Number(couponId),
+      couponCode:
+        couponId !== ""
+          ? null
+          : normalizedCouponCode !== ""
+            ? normalizedCouponCode
+            : null,
       orderDate: null,
       items: normalizedItems,
     });
-  }, [normalizedCouponCode, lines]);
+  }, [couponId, normalizedCouponCode, lines]);
 
   const isValid = useMemo(() => {
     const hasAtLeastOneItem = lines.some((line) => line.itemId !== "");
@@ -188,19 +204,22 @@ export default function OrderUpsertForm(props: {
   }, [lines, props.items]);
 
   const discountInfo = useMemo(() => {
-    if (!couponCheckResult) {
+    const coupon = couponCheckResult?.coupon ?? selectedCoupon;
+    const promotion = couponCheckResult?.promotion ?? null;
+
+    if (!coupon) {
       return {
         eligibleSubtotal: 0,
         discountAmount: 0,
         netValue: calculatedSubtotal,
         discountPercent: null as number | null,
         hasCategoryLimit: false,
+        allowedCategoryIds: null as ReadonlySet<number> | null,
       };
     }
 
     const allowedCategoryIdsRaw =
-      (couponCheckResult.coupon.allowedCategoryIds ?? null) ??
-      (couponCheckResult.promotion.categoryIds ?? null);
+      (coupon.allowedCategoryIds ?? null) ?? (promotion?.categoryIds ?? null);
     const allowedCategoryIds =
       Array.isArray(allowedCategoryIdsRaw) && allowedCategoryIdsRaw.length > 0
         ? new Set(allowedCategoryIdsRaw)
@@ -234,8 +253,8 @@ export default function OrderUpsertForm(props: {
     }
 
     const discountPercent =
-      toNumber(couponCheckResult.promotion.discountValue) ??
-      toNumber(couponCheckResult.coupon.discountValue);
+      (promotion ? toNumber(promotion.discountValue) : null) ??
+      toNumber(coupon.discountValue);
     const percent = discountPercent ?? 0;
     const discountAmount =
       percent <= 0
@@ -249,8 +268,35 @@ export default function OrderUpsertForm(props: {
       netValue,
       discountPercent: discountPercent,
       hasCategoryLimit: allowedCategoryIds !== null,
+      allowedCategoryIds,
     };
-  }, [calculatedSubtotal, couponCheckResult, lines, props.items]);
+  }, [calculatedSubtotal, couponCheckResult, lines, props.items, selectedCoupon]);
+
+  const couponIssues = useMemo(() => {
+    if (!discountInfo.allowedCategoryIds) return [];
+
+    const excludedNames = new Set<string>();
+    for (const line of lines) {
+      if (line.itemId === "") continue;
+      const item = props.items.find((it) => it.id === Number(line.itemId));
+      if (!item) continue;
+
+      const categoryId = item.categoryId ?? null;
+      if (
+        categoryId === null ||
+        !discountInfo.allowedCategoryIds.has(categoryId)
+      ) {
+        excludedNames.add(item.name);
+      }
+    }
+
+    return Array.from(excludedNames).map(
+      (name) => `สินค้า “${name}” ไม่เข้าเงื่อนไขหมวดหมู่`,
+    );
+  }, [discountInfo.allowedCategoryIds, lines, props.items]);
+
+  const calculatedDiscount = discountInfo.discountAmount;
+  const calculatedNet = discountInfo.netValue;
 
   async function handleCheckCoupon() {
     const normalized = normalizedCouponCode;
@@ -358,17 +404,20 @@ export default function OrderUpsertForm(props: {
             </span>
             <select
               value={couponId === "" ? "" : String(couponId)}
-              onChange={(event) => {
-                const value = event.target.value;
-                setCouponId(value === "" ? "" : Number(value));
-                if (value !== "") {
-                  setCouponCode("");
-                }
-              }}
+	              onChange={(event) => {
+	                const value = event.target.value;
+	                setCouponId(value === "" ? "" : Number(value));
+	                setCouponCheckResult(null);
+	                setCouponCheckTone("info");
+	                setCouponCheckMessage(null);
+	                if (value !== "") {
+	                  setCouponCode("");
+	                }
+	              }}
               className="h-10 rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500"
             >
               <option value="">ไม่ใช้คูปอง</option>
-              {props.coupons.map((coupon) => (
+              {coupons.map((coupon) => (
                 <option key={coupon.id} value={coupon.id}>
                   {coupon.code} ({coupon.promotionName}) -{" "}
                   {formatMoney(coupon.discountValue)}
@@ -382,13 +431,43 @@ export default function OrderUpsertForm(props: {
           <span className="font-medium text-gray-700">
             หรือกรอกโค้ดคูปองด้วยตัวเอง
           </span>
+          <div className="flex items-center gap-2">
           <input
             value={couponCode}
-            onChange={(event) => setCouponCode(event.target.value)}
+	            onChange={(event) => {
+	              setCouponCode(event.target.value);
+	              setCouponCheckResult(null);
+	              setCouponCheckTone("info");
+	              setCouponCheckMessage(null);
+	            }}
             placeholder="เช่น WELCOME100"
             disabled={couponId !== ""}
-            className="h-10 rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+	            className="h-10 flex-1 rounded border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
           />
+	          <button
+	            type="button"
+	            onClick={handleCheckCoupon}
+	            disabled={couponId !== "" || couponCheckLoading || normalizedCouponCode === ""}
+	            className="h-10 shrink-0 whitespace-nowrap rounded bg-amber-500 px-6 text-sm font-bold text-white hover:bg-amber-600 transition disabled:bg-gray-300 disabled:text-gray-600 disabled:cursor-not-allowed"
+	          >
+	            {couponCheckLoading ? "กำลังตรวจสอบ..." : "ตรวจสอบคูปอง"}
+	          </button>
+	        </div>
+
+	        {couponCheckMessage ? (
+	          <div
+	            className={[
+	              "mt-2 rounded border px-4 py-3 text-sm font-medium",
+	              couponCheckTone === "error"
+	                ? "border-red-200 bg-red-50 text-red-800"
+	                : couponCheckTone === "warning"
+	                  ? "border-amber-200 bg-amber-50 text-amber-900"
+	                  : "border-blue-200 bg-blue-50 text-blue-800",
+	            ].join(" ")}
+	          >
+	            {couponCheckMessage}
+	          </div>
+	        ) : null}
           <div className="text-xs text-gray-500">
             * ถ้าเลือกคูปองจากรายการด้านบนแล้ว ช่องนี้จะถูกล็อก
           </div>
@@ -474,20 +553,17 @@ export default function OrderUpsertForm(props: {
 
               <div className="col-span-2 flex items-center justify-end gap-2">
                 {(() => {
-                  if (
-                    !selectedCoupon ||
-                    !selectedCoupon.allowedCategoryIds ||
-                    selectedCoupon.allowedCategoryIds.length === 0 ||
-                    line.itemId === ""
-                  ) {
-                    return null;
-                  }
+	                  if (!discountInfo.allowedCategoryIds || line.itemId === "") {
+	                    return null;
+	                  }
 
                   const item = props.items.find((it) => it.id === Number(line.itemId));
                   if (!item) return null;
-                  const allowed = new Set(selectedCoupon.allowedCategoryIds);
-                  const ok = item.categoryId !== null && item.categoryId !== undefined && allowed.has(item.categoryId);
-                  return ok ? null : (
+	                  const categoryId = item.categoryId ?? null;
+	                  const ok =
+	                    categoryId !== null &&
+	                    discountInfo.allowedCategoryIds.has(categoryId);
+	                  return ok ? null : (
                     <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded">
                       งดร่วมรายการ
                     </span>
