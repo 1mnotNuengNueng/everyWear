@@ -1,6 +1,10 @@
 spring:
   application:
     name: everyWear
+autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
 
 server:
   port: ${PORT:8080}
