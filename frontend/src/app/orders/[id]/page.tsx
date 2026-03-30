@@ -54,12 +54,19 @@ export default async function OrderDetailPage({
 }) {
   const { id } = await params;
 
+  if (!/^\d+$/.test(id)) {
+    notFound();
+  }
+
   const response = await apiGet(`/api/orders/${id}`);
   if (response.status === 404) {
     notFound();
   }
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Request failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`,
+    );
   }
 
   const order = (await response.json()) as OrderDetail;

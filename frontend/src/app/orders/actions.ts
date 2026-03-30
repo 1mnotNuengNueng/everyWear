@@ -57,7 +57,7 @@ export async function updateOrderAction(orderId: number, formData: FormData) {
   redirect(`/orders/${result.id}`);
 }
 
-export async function deleteOrderAction(orderId: number, redirectTo?: string) {
+export async function deleteOrderAction(orderId: number, _formData: FormData) {
   const cancelPath = `/api/orders/${orderId}/cancel`;
   const cancelUrl = apiUrl(cancelPath);
   const cancelResponse = await fetch(cancelUrl, {
@@ -77,5 +77,5 @@ export async function deleteOrderAction(orderId: number, redirectTo?: string) {
     }
   }
 
-  redirect(redirectTo ?? "/orders");
+  redirect("/orders");
 }
