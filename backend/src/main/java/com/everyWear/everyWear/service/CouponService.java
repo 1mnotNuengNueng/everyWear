@@ -1,5 +1,6 @@
 package com.everyWear.everyWear.service;
 
+import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Date;
@@ -13,6 +14,7 @@ import com.everyWear.everyWear.DAO.CouponDAO;
 import com.everyWear.everyWear.DAO.PromotionDAO;
 import com.everyWear.everyWear.dto.coupon.CouponRequest;
 import com.everyWear.everyWear.dto.coupon.CouponResponse;
+import com.everyWear.everyWear.dto.coupon.CouponStatusUpdateRequest;
 import com.everyWear.everyWear.exception.BadRequestException;
 import com.everyWear.everyWear.exception.ResourceNotFoundException;
 import com.everyWear.everyWear.model.Coupon;
@@ -23,8 +25,13 @@ import com.everyWear.everyWear.model.PromotionCategory;
 @Transactional
 public class CouponService {
 
+	private static final String COUPON_CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+	private static final int COUPON_CODE_LENGTH = 10;
+	private static final int MAX_CODE_GENERATION_ATTEMPTS = 20;
+
 	private final CouponDAO couponDAO;
 	private final PromotionDAO promotionDAO;
+	private final SecureRandom secureRandom = new SecureRandom();
 
 	public CouponService(CouponDAO couponDAO, PromotionDAO promotionDAO) {
 		this.couponDAO = couponDAO;
@@ -32,11 +39,9 @@ public class CouponService {
 	}
 
 	public CouponResponse createCoupon(CouponRequest request) {
-		validateUniqueCode(request.getCode(), null);
-
 		Promotion promotion = getPromotionById(request.getPromotionId());
 		Coupon coupon = new Coupon();
-		applyRequestToCoupon(coupon, request, promotion);
+		applyRequestToCoupon(coupon, request, promotion, generateUniqueCouponCode());
 		coupon.setCreatedAt(new Date());
 
 		return toResponse(couponDAO.save(coupon));
@@ -55,13 +60,23 @@ public class CouponService {
 		return toResponse(getCouponEntityById(id));
 	}
 
+	@Transactional(readOnly = true)
+	public CouponResponse getCouponByCode(String code) {
+		return toResponse(getCouponEntityByCode(code));
+	}
+
 	public CouponResponse updateCoupon(Integer id, CouponRequest request) {
 		Coupon coupon = getCouponEntityById(id);
-		validateUniqueCode(request.getCode(), id);
-
 		Promotion promotion = getPromotionById(request.getPromotionId());
-		applyRequestToCoupon(coupon, request, promotion);
+		String code = resolveCouponCodeForUpdate(coupon, request.getCode(), id);
+		applyRequestToCoupon(coupon, request, promotion, code);
 
+		return toResponse(couponDAO.save(coupon));
+	}
+
+	public CouponResponse updateCouponStatus(Integer id, CouponStatusUpdateRequest request) {
+		Coupon coupon = getCouponEntityById(id);
+		coupon.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
 		return toResponse(couponDAO.save(coupon));
 	}
 
@@ -70,9 +85,9 @@ public class CouponService {
 		couponDAO.delete(coupon);
 	}
 
-	private void applyRequestToCoupon(Coupon coupon, CouponRequest request, Promotion promotion) {
+	private void applyRequestToCoupon(Coupon coupon, CouponRequest request, Promotion promotion, String code) {
 		coupon.setPromotion(promotion);
-		coupon.setCode(request.getCode().trim());
+		coupon.setCode(code);
 		coupon.setExpireDate(Timestamp.valueOf(request.getExpireDate()));
 		coupon.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
 	}
@@ -82,13 +97,22 @@ public class CouponService {
 				.orElseThrow(() -> new ResourceNotFoundException("Coupon with id " + id + " was not found"));
 	}
 
+	private Coupon getCouponEntityByCode(String code) {
+		String normalizedCode = normalizeCode(code);
+		return couponDAO.findByCode(normalizedCode)
+				.orElseThrow(() -> new ResourceNotFoundException("Coupon with code " + normalizedCode + " was not found"));
+	}
+
 	private Promotion getPromotionById(Integer id) {
-		return promotionDAO.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Promotion with id " + id + " was not found"));
+		Promotion promotion = promotionDAO.getPromotionById(id);
+		if (promotion == null) {
+			throw new ResourceNotFoundException("Promotion with id " + id + " was not found");
+		}
+		return promotion;
 	}
 
 	private void validateUniqueCode(String code, Integer couponId) {
-		String normalizedCode = code.trim();
+		String normalizedCode = normalizeCode(code);
 		boolean exists = couponId == null
 				? couponDAO.existsByCode(normalizedCode)
 				: couponDAO.existsByCodeAndIdNot(normalizedCode, couponId);
@@ -96,6 +120,41 @@ public class CouponService {
 		if (exists) {
 			throw new BadRequestException("Coupon code already exists");
 		}
+	}
+
+	private String resolveCouponCodeForUpdate(Coupon coupon, String requestedCode, Integer couponId) {
+		if (requestedCode == null || requestedCode.trim().isEmpty()) {
+			return coupon.getCode();
+		}
+
+		validateUniqueCode(requestedCode, couponId);
+		return normalizeCode(requestedCode);
+	}
+
+	private String generateUniqueCouponCode() {
+		for (int attempt = 0; attempt < MAX_CODE_GENERATION_ATTEMPTS; attempt++) {
+			String code = randomCode();
+			if (!couponDAO.existsByCode(code)) {
+				return code;
+			}
+		}
+		throw new BadRequestException("Unable to generate a unique coupon code right now");
+	}
+
+	private String randomCode() {
+		StringBuilder builder = new StringBuilder(COUPON_CODE_LENGTH);
+		for (int index = 0; index < COUPON_CODE_LENGTH; index++) {
+			int randomIndex = secureRandom.nextInt(COUPON_CODE_CHARACTERS.length());
+			builder.append(COUPON_CODE_CHARACTERS.charAt(randomIndex));
+		}
+		return builder.toString();
+	}
+
+	private String normalizeCode(String code) {
+		if (code == null || code.trim().isEmpty()) {
+			throw new BadRequestException("Coupon code is required");
+		}
+		return code.trim().toUpperCase();
 	}
 
 	private CouponResponse toResponse(Coupon coupon) {
@@ -130,4 +189,36 @@ public class CouponService {
 		}
 		return new Timestamp(value.getTime()).toLocalDateTime();
 	}
+
+public CouponResponse createPartnerCoupon(CouponRequest request) {
+        // 1. บังคับเซ็ต Promotion ID เป็น 1 สำหรับ Partner เสมอ
+        request.setPromotionId(1);
+        
+        // 2. บังคับเซ็ตวันหมดอายุ เป็นเวลาปัจจุบัน + 30 วัน
+        request.setExpireDate(LocalDateTime.now().plusDays(30));
+
+        // 3. ดึง Promotion (ระบบจะดึง ID 1 มาให้เสมอตามที่เซ็ตไว้)     
+        Promotion promotion = getPromotionById(request.getPromotionId());
+        
+        Coupon coupon = new Coupon();
+        
+        applyRequestToCoupon(coupon, request, promotion, generateUniqueCouponCode());
+        coupon.setCreatedAt(new Date());
+
+        return toResponse(couponDAO.save(coupon));
+    }
+
+// เปลี่ยน Parameter เป็นรับแค่ ID และคืนค่าเป็น List
+    @Transactional(readOnly = true)
+    public List<CouponResponse> getAllCouponsByPromotionId(Integer promotionId) {
+        
+        // เช็คก่อนว่ามี Promotion นี้อยู่จริงไหม
+        Promotion promotion = getPromotionById(promotionId);
+
+        // คุณต้องไปเพิ่มคำสั่ง findByPromotion_Id(promotionId) ใน CouponDAO ก่อนนะครับ
+        return couponDAO.findByPromotion_Id(promotionId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
 }

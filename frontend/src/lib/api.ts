@@ -26,7 +26,7 @@ export async function apiGetJson<T>(path: string): Promise<T> {
 
 export async function apiRequestJson<TResponse>(
   path: string,
-  init: RequestInit & { body?: unknown },
+  init: Omit<RequestInit, "body"> & { body?: unknown },
 ): Promise<TResponse> {
   const url = apiUrl(path);
   const response = await fetch(url, {
