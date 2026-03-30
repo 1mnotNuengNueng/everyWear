@@ -12,12 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.everyWear.everyWear.DAO.CouponDAO;
 import com.everyWear.everyWear.DAO.PromotionDAO;
-import com.everyWear.everyWear.dto.coupon.CouponCategoryResponse;
-import com.everyWear.everyWear.dto.coupon.CouponCodeValidationRequest;
 import com.everyWear.everyWear.dto.coupon.CouponRequest;
 import com.everyWear.everyWear.dto.coupon.CouponResponse;
 import com.everyWear.everyWear.dto.coupon.CouponStatusUpdateRequest;
-import com.everyWear.everyWear.dto.coupon.CouponValidationResponse;
 import com.everyWear.everyWear.exception.BadRequestException;
 import com.everyWear.everyWear.exception.ResourceNotFoundException;
 import com.everyWear.everyWear.model.Coupon;
@@ -66,17 +63,6 @@ public class CouponService {
 	@Transactional(readOnly = true)
 	public CouponResponse getCouponByCode(String code) {
 		return toResponse(getCouponEntityByCode(code));
-	}
-
-	@Transactional(readOnly = true)
-	public CouponValidationResponse validateCouponCode(CouponCodeValidationRequest request) {
-		Coupon coupon = getCouponEntityByCode(request.getCode());
-		validateCouponUsable(coupon);
-
-		CouponValidationResponse response = new CouponValidationResponse();
-		response.setCoupon(toResponse(coupon));
-		response.setCategories(toCategoryResponses(coupon));
-		return response;
 	}
 
 	public CouponResponse updateCoupon(Integer id, CouponRequest request) {
@@ -171,52 +157,6 @@ public class CouponService {
 		return code.trim().toUpperCase();
 	}
 
-	private void validateCouponUsable(Coupon coupon) {
-		Date now = new Date();
-
-		if (!coupon.isIsActive()) {
-			throw new BadRequestException("Coupon is inactive");
-		}
-		if (coupon.getExpireDate() != null && coupon.getExpireDate().before(now)) {
-			throw new BadRequestException("Coupon is expired");
-		}
-		if (coupon.getPromotion() != null) {
-			if (!coupon.getPromotion().isIsActive()) {
-				throw new BadRequestException("Promotion is inactive");
-			}
-			if (coupon.getPromotion().getStartAt() != null && coupon.getPromotion().getStartAt().after(now)) {
-				throw new BadRequestException("Promotion has not started");
-			}
-			if (coupon.getPromotion().getEndAt() != null && coupon.getPromotion().getEndAt().before(now)) {
-				throw new BadRequestException("Promotion has ended");
-			}
-		}
-	}
-
-	private List<CouponCategoryResponse> toCategoryResponses(Coupon coupon) {
-		Set<PromotionCategory> promotionCategories = coupon.getPromotion().getPromotionCategories();
-		if (promotionCategories == null || promotionCategories.isEmpty()) {
-			return List.of();
-		}
-
-		return promotionCategories.stream()
-				.map(PromotionCategory::getCategory)
-				.filter(category -> category != null && category.getId() != null)
-				.collect(java.util.stream.Collectors.toMap(
-						category -> category.getId(),
-						category -> category,
-						(first, second) -> first))
-				.values()
-				.stream()
-				.map(category -> {
-					CouponCategoryResponse response = new CouponCategoryResponse();
-					response.setId(category.getId());
-					response.setName(category.getName());
-					return response;
-				})
-				.toList();
-	}
-
 	private CouponResponse toResponse(Coupon coupon) {
 		CouponResponse response = new CouponResponse();
 		response.setId(coupon.getId());
@@ -249,4 +189,36 @@ public class CouponService {
 		}
 		return new Timestamp(value.getTime()).toLocalDateTime();
 	}
+
+public CouponResponse createPartnerCoupon(CouponRequest request) {
+        // 1. บังคับเซ็ต Promotion ID เป็น 1 สำหรับ Partner เสมอ
+        request.setPromotionId(1);
+        
+        // 2. บังคับเซ็ตวันหมดอายุ เป็นเวลาปัจจุบัน + 30 วัน
+        request.setExpireDate(LocalDateTime.now().plusDays(30));
+
+        // 3. ดึง Promotion (ระบบจะดึง ID 1 มาให้เสมอตามที่เซ็ตไว้)     
+        Promotion promotion = getPromotionById(request.getPromotionId());
+        
+        Coupon coupon = new Coupon();
+        
+        applyRequestToCoupon(coupon, request, promotion, generateUniqueCouponCode());
+        coupon.setCreatedAt(new Date());
+
+        return toResponse(couponDAO.save(coupon));
+    }
+
+// เปลี่ยน Parameter เป็นรับแค่ ID และคืนค่าเป็น List
+    @Transactional(readOnly = true)
+    public List<CouponResponse> getAllCouponsByPromotionId(Integer promotionId) {
+        
+        // เช็คก่อนว่ามี Promotion นี้อยู่จริงไหม
+        Promotion promotion = getPromotionById(promotionId);
+
+        // คุณต้องไปเพิ่มคำสั่ง findByPromotion_Id(promotionId) ใน CouponDAO ก่อนนะครับ
+        return couponDAO.findByPromotion_Id(promotionId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
 }
