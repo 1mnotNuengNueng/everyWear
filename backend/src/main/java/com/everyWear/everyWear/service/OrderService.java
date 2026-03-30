@@ -58,6 +58,22 @@ public class OrderService {
 		return toDetailResponse(orders);
 	}
 
+	public OrderDetailResponse recalculateOrder(Integer id) {
+		Orders orders = ordersDAO.findByIdWithDetails(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " was not found"));
+		recalculateTotals(orders);
+		return toDetailResponse(ordersDAO.save(orders));
+	}
+
+	public int recalculateAllOrders() {
+		List<Orders> ordersList = ordersDAO.findAllWithDetails();
+		for (Orders orders : ordersList) {
+			recalculateTotals(orders);
+		}
+		ordersDAO.saveAll(ordersList);
+		return ordersList.size();
+	}
+
 	public OrderDetailResponse createOrder(OrderUpsertRequest request) {
 		Orders orders = new Orders();
 		orders.setStatus(OrderStatus.ACTIVE);
@@ -79,6 +95,10 @@ public class OrderService {
 	}
 
 	public void deleteOrder(Integer id) {
+		cancelOrder(id);
+	}
+
+	public void cancelOrder(Integer id) {
 		Orders orders = ordersDAO.findByIdWithDetails(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Order with id " + id + " was not found"));
 		if (orders.getStatus() == OrderStatus.CANCELLED) {
@@ -162,6 +182,25 @@ public class OrderService {
 
 		orders.getOrderDetails().clear();
 		orders.getOrderDetails().addAll(details);
+
+		BigDecimal totalPrice = calculateTotalPrice(details);
+		BigDecimal eligibleSubtotal = calculateEligibleSubtotal(coupon, details);
+		BigDecimal discountAmount = coupon == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+				: calculateDiscountAmount(coupon, eligibleSubtotal);
+		BigDecimal netValue = totalPrice.subtract(discountAmount);
+
+		orders.setTotalPrice(totalPrice);
+		orders.setDiscountAmount(discountAmount);
+		orders.setNetValue(netValue);
+	}
+
+	private void recalculateTotals(Orders orders) {
+		if (orders.getStatus() == null) {
+			orders.setStatus(OrderStatus.ACTIVE);
+		}
+
+		Set<OrderDetail> details = orders.getOrderDetails() == null ? Set.of() : orders.getOrderDetails();
+		Coupon coupon = orders.getCoupon();
 
 		BigDecimal totalPrice = calculateTotalPrice(details);
 		BigDecimal eligibleSubtotal = calculateEligibleSubtotal(coupon, details);
@@ -271,9 +310,20 @@ public class OrderService {
 		if (coupon == null || coupon.getPromotion() == null || coupon.getPromotion().getDiscountValue() == null) {
 			return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 		}
-		BigDecimal discountValue = coupon.getPromotion().getDiscountValue();
-		BigDecimal discount = discountValue.min(totalPrice);
-		return discount.setScale(2, RoundingMode.HALF_UP);
+
+		BigDecimal discountPercent = coupon.getPromotion().getDiscountValue();
+		if (discountPercent.compareTo(BigDecimal.ZERO) <= 0) {
+			return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+		}
+
+		BigDecimal maxPercent = new BigDecimal("100");
+		if (discountPercent.compareTo(maxPercent) > 0) {
+			discountPercent = maxPercent;
+		}
+
+		BigDecimal discount = totalPrice.multiply(discountPercent)
+				.divide(maxPercent, 4, RoundingMode.HALF_UP);
+		return discount.min(totalPrice).setScale(2, RoundingMode.HALF_UP);
 	}
 
 	private BigDecimal calculateLineTotal(BigDecimal unitPrice, int quantity) {
