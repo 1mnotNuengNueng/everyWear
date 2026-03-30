@@ -5,13 +5,13 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.everyWear.everyWear.DAO.CouponDAO;
 import com.everyWear.everyWear.DAO.OrdersDAO;
+import com.everyWear.everyWear.DAO.PromotionCategoryDAO;
 import com.everyWear.everyWear.DAO.PromotionDAO;
 import com.everyWear.everyWear.dto.coupon.CouponCategoryResponse;
 import com.everyWear.everyWear.dto.coupon.CouponCategorySummary;
@@ -38,12 +38,18 @@ public class CouponService {
 
 	private final CouponDAO couponDAO;
 	private final PromotionDAO promotionDAO;
+	private final PromotionCategoryDAO promotionCategoryDAO;
 	private final OrdersDAO ordersDAO;
 	private final SecureRandom secureRandom = new SecureRandom();
 
-	public CouponService(CouponDAO couponDAO, PromotionDAO promotionDAO, OrdersDAO ordersDAO) {
+	public CouponService(
+			CouponDAO couponDAO,
+			PromotionDAO promotionDAO,
+			PromotionCategoryDAO promotionCategoryDAO,
+			OrdersDAO ordersDAO) {
 		this.couponDAO = couponDAO;
 		this.promotionDAO = promotionDAO;
+		this.promotionCategoryDAO = promotionCategoryDAO;
 		this.ordersDAO = ordersDAO;
 	}
 
@@ -211,29 +217,11 @@ public class CouponService {
 		response.setDiscountValue(coupon.getPromotion().getDiscountValue());
 		response.setUsedOrderIds(resolveUsedOrderIds(coupon));
 
-		Set<PromotionCategory> promotionCategories = coupon.getPromotion().getPromotionCategories();
-		if (promotionCategories != null && !promotionCategories.isEmpty()) {
-			List<CouponCategorySummary> allowedCategories = promotionCategories.stream()
-					.map(PromotionCategory::getCategory)
-					.filter(category -> category != null && category.getId() != null)
-					.collect(java.util.stream.Collectors.toMap(
-							category -> category.getId(),
-							category -> category,
-							(first, second) -> first))
-					.values()
-					.stream()
-					.map(category -> {
-						CouponCategorySummary summary = new CouponCategorySummary();
-						summary.setId(category.getId());
-						summary.setName(category.getName());
-						return summary;
-					})
-					.toList();
-			if (!allowedCategories.isEmpty()) {
-				response.setAllowedCategories(allowedCategories);
-				response.setAllowedCategoryIds(
-						allowedCategories.stream().map(CouponCategorySummary::getId).toList());
-			}
+		List<CouponCategorySummary> allowedCategories = resolveAllowedCategories(coupon);
+		if (!allowedCategories.isEmpty()) {
+			response.setAllowedCategories(allowedCategories);
+			response.setAllowedCategoryIds(
+					allowedCategories.stream().map(CouponCategorySummary::getId).toList());
 		}
 
 		return response;
@@ -244,6 +232,34 @@ public class CouponService {
 			return List.of();
 		}
 		return ordersDAO.findOrderIdsByCouponId(coupon.getId());
+	}
+
+	private List<CouponCategorySummary> resolveAllowedCategories(Coupon coupon) {
+		if (coupon.getPromotion() == null || coupon.getPromotion().getId() == null) {
+			return List.of();
+		}
+
+		List<PromotionCategory> promotionCategories = promotionCategoryDAO.getByPromotionId(coupon.getPromotion().getId());
+		if (promotionCategories.isEmpty()) {
+			return List.of();
+		}
+
+		return promotionCategories.stream()
+				.map(PromotionCategory::getCategory)
+				.filter(category -> category != null && category.getId() != null)
+				.collect(java.util.stream.Collectors.toMap(
+						category -> category.getId(),
+						category -> category,
+						(first, second) -> first))
+				.values()
+				.stream()
+				.map(category -> {
+					CouponCategorySummary summary = new CouponCategorySummary();
+					summary.setId(category.getId());
+					summary.setName(category.getName());
+					return summary;
+				})
+				.toList();
 	}
 
 	private List<CouponCategoryResponse> mapCouponCategories(CouponResponse couponResponse) {

@@ -41,6 +41,7 @@ function formatDiscountPercent(value: string | number | null) {
 
 export default function CouponsList(props: {
   coupons: CouponSummary[];
+  categories: Array<{ id: number; name: string }>;
   deleteCouponAction: (couponId: number) => Promise<void>;
 }) {
   const [page, setPage] = useState(1);
@@ -87,6 +88,11 @@ export default function CouponsList(props: {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredCoupons.slice(start, start + PAGE_SIZE);
   }, [currentPage, filteredCoupons]);
+
+  const categoryNameMap = useMemo(
+    () => new Map(props.categories.map((category) => [category.id, category.name])),
+    [props.categories],
+  );
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -165,7 +171,18 @@ export default function CouponsList(props: {
           <div className="mt-6 grid gap-4">
             {pagedCoupons.map((coupon) => {
               const usedOrderIds = coupon.usedOrderIds ?? [];
-              const allowedCategories = coupon.allowedCategories ?? [];
+              const allowedCategories =
+                coupon.allowedCategories && coupon.allowedCategories.length > 0
+                  ? coupon.allowedCategories
+                  : (coupon.allowedCategoryIds ?? [])
+                      .map((categoryId) => {
+                        const categoryName = categoryNameMap.get(categoryId);
+                        return categoryName ? { id: categoryId, name: categoryName } : null;
+                      })
+                      .filter(
+                        (category): category is { id: number; name: string } =>
+                          category !== null,
+                      );
 
               return (
                 <article

@@ -51,7 +51,9 @@ async function getCouponByCode(code: string) {
   return (await response.json()) as CouponLookupResponse;
 }
 
-export default function CouponCodeChecker() {
+export default function CouponCodeChecker(props: {
+  categories: Array<{ id: number; name: string }>;
+}) {
   const [code, setCode] = useState("");
   const [result, setResult] = useState<CouponLookupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,21 @@ export default function CouponCodeChecker() {
     });
   }
 
-  const allowedCategories = result?.allowedCategories ?? [];
+  const categoryNameMap = new Map(
+    props.categories.map((category) => [category.id, category.name]),
+  );
+
+  const allowedCategories =
+    result?.allowedCategories && result.allowedCategories.length > 0
+      ? result.allowedCategories
+      : (result?.allowedCategoryIds ?? [])
+          .map((categoryId) => {
+            const categoryName = categoryNameMap.get(categoryId);
+            return categoryName ? { id: categoryId, name: categoryName } : null;
+          })
+          .filter(
+            (category): category is { id: number; name: string } => category !== null,
+          );
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
