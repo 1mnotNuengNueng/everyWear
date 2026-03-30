@@ -1,4 +1,4 @@
-package com.everyWear.everyWear.config;
+/*package com.everyWear.everyWear.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,4 +38,4 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/**", config);
         return source;
     }
-}
+}*/
