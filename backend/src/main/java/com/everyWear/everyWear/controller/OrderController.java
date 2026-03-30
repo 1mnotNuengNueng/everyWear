@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.everyWear.everyWear.dto.order.OrderDetailResponse;
 import com.everyWear.everyWear.dto.order.OrderSummaryResponse;
 import com.everyWear.everyWear.dto.order.OrderUpsertRequest;
+import com.everyWear.everyWear.dto.order.RecalculateOrdersResponse;
 import com.everyWear.everyWear.service.OrderService;
 
 import jakarta.validation.Valid;
@@ -42,6 +43,17 @@ public class OrderController {
 		return ResponseEntity.ok(orderService.getOrderDetailById(id));
 	}
 
+	@PutMapping("/{id}/recalculate")
+	public ResponseEntity<OrderDetailResponse> recalculateOrder(@PathVariable Integer id) {
+		return ResponseEntity.ok(orderService.recalculateOrder(id));
+	}
+
+	@PutMapping("/recalculate")
+	public ResponseEntity<RecalculateOrdersResponse> recalculateAllOrders() {
+		int updatedCount = orderService.recalculateAllOrders();
+		return ResponseEntity.ok(new RecalculateOrdersResponse(updatedCount));
+	}
+
 	@PostMapping
 	public ResponseEntity<OrderDetailResponse> createOrder(@Valid @RequestBody OrderUpsertRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(request));
@@ -53,9 +65,15 @@ public class OrderController {
 		return ResponseEntity.ok(orderService.updateOrder(id, request));
 	}
 
+	@PutMapping("/{id}/cancel")
+	public ResponseEntity<Void> cancelOrder(@PathVariable Integer id) {
+		orderService.cancelOrder(id);
+		return ResponseEntity.noContent().build();
+	}
+
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> deleteOrder(@PathVariable Integer id) {
-		orderService.deleteOrder(id);
+		orderService.cancelOrder(id);
 		return ResponseEntity.noContent().build();
 	}
 }

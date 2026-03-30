@@ -57,7 +57,25 @@ export async function updateOrderAction(orderId: number, formData: FormData) {
   redirect(`/orders/${result.id}`);
 }
 
-export async function deleteOrderAction(orderId: number) {
-  await backendJsonRequest<void>(`/api/orders/${orderId}`, { method: "DELETE" });
-  redirect(`/orders/${orderId}`);
+export async function deleteOrderAction(orderId: number, redirectTo?: string) {
+  const cancelPath = `/api/orders/${orderId}/cancel`;
+  const cancelUrl = apiUrl(cancelPath);
+  const cancelResponse = await fetch(cancelUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!cancelResponse.ok) {
+    if (cancelResponse.status === 404 || cancelResponse.status === 405) {
+      await backendJsonRequest<void>(`/api/orders/${orderId}`, { method: "DELETE" });
+    } else {
+      const text = await cancelResponse.text().catch(() => "");
+      throw new Error(
+        `Backend request failed: ${cancelResponse.status} ${cancelResponse.statusText}${text ? ` - ${text}` : ""}`,
+      );
+    }
+  }
+
+  redirect(redirectTo ?? "/orders");
 }

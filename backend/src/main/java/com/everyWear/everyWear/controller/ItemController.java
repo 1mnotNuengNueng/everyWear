@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.everyWear.everyWear.DAO.ItemDAO;
 import com.everyWear.everyWear.dto.item.ItemSummaryResponse;
 
+/**
+ * NOTE: Friend-owned area (Items API) — waiting to be extended/maintained by the teammate responsible for Items.
+ *
+ * Endpoints:
+ * - GET /api/items : list items (id/name/price/category)
+ */
 @RestController
 @RequestMapping("/api/items")
 public class ItemController {
