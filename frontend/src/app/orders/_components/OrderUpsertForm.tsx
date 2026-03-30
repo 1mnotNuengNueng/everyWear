@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type ItemOption = {
   id: number;
@@ -109,6 +109,7 @@ export default function OrderUpsertForm(props: {
   initial?: InitialOrder;
   action: (formData: FormData) => void | Promise<void>;
 }) {
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState<string>(
     props.initial?.couponCode ?? "",
   );
@@ -150,6 +151,15 @@ export default function OrderUpsertForm(props: {
         };
       });
 
+    if (props.mode === "edit") {
+      return JSON.stringify({
+        couponId: null,
+        couponCode: null,
+        orderDate: null,
+        items: normalizedItems,
+      });
+    }
+
     const resolvedCouponId = couponCheckResult?.coupon.id ?? null;
 
     return JSON.stringify({
@@ -163,7 +173,7 @@ export default function OrderUpsertForm(props: {
       orderDate: null,
       items: normalizedItems,
     });
-  }, [couponCheckResult, normalizedCouponCode, lines]);
+  }, [couponCheckResult, normalizedCouponCode, lines, props.mode]);
 
   const isValid = useMemo(() => {
     const hasAtLeastOneItem = lines.some((line) => line.itemId !== "");
@@ -379,12 +389,60 @@ export default function OrderUpsertForm(props: {
     }
   }
 
+  useEffect(() => {
+    if (props.mode !== "edit") return;
+
+    const normalized = normalizedCouponCode;
+    if (!normalized) return;
+
+    void (async () => {
+      try {
+        setCouponCheckLoading(true);
+        setCouponCheckTone("info");
+        setCouponCheckMessage(null);
+
+        const coupon = await localGetJson<CouponApiResponse>(
+          `/api/coupons/code/${encodeURIComponent(normalized)}`,
+        );
+
+        if (coupon.promotionId) {
+          const promotion = await localGetJson<PromotionApiResponse>(
+            `/api/promotions/${coupon.promotionId}`,
+          );
+          setCouponCheckResult({ coupon, promotion });
+        } else {
+          setCouponCheckResult(null);
+        }
+      } catch {
+        setCouponCheckResult(null);
+      } finally {
+        setCouponCheckLoading(false);
+      }
+    })();
+  }, [normalizedCouponCode, props.mode]);
+
   return (
     <form
       action={props.action}
+      onSubmit={(event) => {
+        if (!isValid) {
+          event.preventDefault();
+          setSubmitMessage("กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนบันทึก");
+          return;
+        }
+        setSubmitMessage(null);
+      }}
       className="mt-8 grid gap-6"
     >
+      <input type="hidden" name="payload" value={payloadJson} readOnly />
+
+      {submitMessage ? (
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {submitMessage}
+        </div>
+      ) : null}
   
+      {props.mode === "create" ? (
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-gray-700">
             กรอกโค้ดคูปอง
@@ -427,6 +485,21 @@ export default function OrderUpsertForm(props: {
 	        ) : null}
         
         </label>
+      ) : (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-sm">
+          <div className="font-bold">คูปองที่ใช้กับออเดอร์นี้</div>
+          <div className="mt-1">
+            {props.initial?.couponCode ? (
+              <span className="font-mono">{props.initial.couponCode}</span>
+            ) : (
+              <span>-</span>
+            )}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            แก้ไขออเดอร์จะไม่สามารถเปลี่ยนคูปองได้
+          </div>
+        </div>
+      )}
 
         {couponIssues.length > 0 ? (
           <div className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">

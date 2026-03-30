@@ -78,7 +78,9 @@ public class OrderService {
 		Orders orders = new Orders();
 		orders.setStatus(OrderStatus.ACTIVE);
 		applyUpsertRequest(orders, request, true);
-		return toDetailResponse(ordersDAO.save(orders));
+		Orders saved = ordersDAO.save(orders);
+		deactivateCouponIfPresent(saved.getCoupon());
+		return toDetailResponse(saved);
 	}
 
 	public OrderDetailResponse updateOrder(Integer id, OrderUpsertRequest request) {
@@ -91,7 +93,9 @@ public class OrderService {
 			throw new BadRequestException("Cannot update a cancelled order");
 		}
 		applyUpsertRequest(orders, request, false);
-		return toDetailResponse(ordersDAO.save(orders));
+		Orders saved = ordersDAO.save(orders);
+		deactivateCouponIfPresent(saved.getCoupon());
+		return toDetailResponse(saved);
 	}
 
 	public void deleteOrder(Integer id) {
@@ -148,7 +152,13 @@ public class OrderService {
 		if (orders.getStatus() == null) {
 			orders.setStatus(OrderStatus.ACTIVE);
 		}
-		Coupon coupon = resolveCoupon(request.getCouponId(), request.getCouponCode());
+
+		Coupon coupon;
+		if (isCreate) {
+			coupon = resolveCoupon(request.getCouponId(), request.getCouponCode());
+		} else {
+			coupon = enforceCouponUnchanged(orders.getCoupon(), request.getCouponId(), request.getCouponCode());
+		}
 		orders.setCoupon(coupon);
 
 		if (isCreate && orders.getCreatedAt() == null) {
@@ -192,6 +202,50 @@ public class OrderService {
 		orders.setTotalPrice(totalPrice);
 		orders.setDiscountAmount(discountAmount);
 		orders.setNetValue(netValue);
+	}
+
+	private Coupon enforceCouponUnchanged(Coupon existingCoupon, Integer requestCouponId, String requestCouponCode) {
+		Integer existingId = existingCoupon == null ? null : existingCoupon.getId();
+		String existingCode = existingCoupon == null ? null : existingCoupon.getCode();
+		String normalizedRequestCode = requestCouponCode == null ? null : requestCouponCode.trim();
+		String normalizedExistingCode = existingCode == null ? null : existingCode.trim();
+
+		boolean requestHasCode = normalizedRequestCode != null && !normalizedRequestCode.isEmpty();
+
+		if (existingCoupon == null) {
+			if (requestCouponId != null || requestHasCode) {
+				throw new BadRequestException("Cannot add or change coupon on an existing order");
+			}
+			return null;
+		}
+
+		// If request does not include coupon fields, keep existing coupon.
+		if (requestCouponId == null && !requestHasCode) {
+			return existingCoupon;
+		}
+
+		if (requestCouponId != null && !requestCouponId.equals(existingId)) {
+			throw new BadRequestException("Cannot change coupon on an existing order");
+		}
+		if (requestHasCode && (normalizedExistingCode == null
+				|| !normalizedExistingCode.equalsIgnoreCase(normalizedRequestCode))) {
+			throw new BadRequestException("Cannot change coupon on an existing order");
+		}
+
+		// NOTE: Do not validate usability here. Coupons can become inactive after first use,
+		// but we still allow editing the same order that already consumed the coupon.
+		return existingCoupon;
+	}
+
+	private void deactivateCouponIfPresent(Coupon coupon) {
+		if (coupon == null) {
+			return;
+		}
+		if (!coupon.isIsActive()) {
+			return;
+		}
+		coupon.setIsActive(false);
+		couponDAO.save(coupon);
 	}
 
 	private void recalculateTotals(Orders orders) {
