@@ -22,6 +22,19 @@ import com.everyWear.everyWear.service.CouponService;
 
 import jakarta.validation.Valid;
 
+<<<<<<< HEAD
+=======
+/**
+ * NOTE: Friend-owned area (Coupons API) — waiting to be extended/maintained by the teammate responsible for Coupons.
+ *
+ * Endpoints:
+ * - POST /api/coupons : create coupon
+ * - GET /api/coupons : list coupons
+ * - GET /api/coupons/{id} : get coupon by id
+ * - PUT /api/coupons/{id} : update coupon
+ * - DELETE /api/coupons/{id} : delete coupon
+ */
+>>>>>>> 7f7923f565874ced6b51b1c4c187dbddc7595d60
 @Validated
 @RestController
 @RequestMapping("/api/coupons")
@@ -71,6 +84,7 @@ public class CouponController {
 		return ResponseEntity.noContent().build();
 	}
 
+
 	@PostMapping("/partner")
 	public ResponseEntity<CouponResponse> createPartnerCoupon() {
 		return ResponseEntity.status(HttpStatus.CREATED).body(couponService.createPartnerCoupon());
@@ -80,4 +94,5 @@ public class CouponController {
 	public ResponseEntity<List<CouponResponse>> getAllCouponsByPromotionId(@PathVariable Integer id) {
 		return ResponseEntity.ok(couponService.getAllCouponsByPromotionId(id));
 	}
+
 }
