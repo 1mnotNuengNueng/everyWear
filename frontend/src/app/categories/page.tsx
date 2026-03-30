@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiGetJson, apiRequestJson } from "@/lib/api";
 
 type Category = {
   id: number;
@@ -15,21 +16,28 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchCategories = async () => {
-    const res = await fetch("http://localhost:8080/api/categories");
-    const data = (await res.json()) as Category[];
+    const data = await apiGetJson<Category[]>("/api/categories");
     setCategories(data);
+    setLoadError(null);
   };
 
   useEffect(() => {
     let ignore = false;
 
     const loadCategories = async () => {
-      const res = await fetch("http://localhost:8080/api/categories");
-      const data = (await res.json()) as Category[];
-      if (!ignore) {
-        setCategories(data);
+      try {
+        const data = await apiGetJson<Category[]>("/api/categories");
+        if (!ignore) {
+          setCategories(data);
+          setLoadError(null);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
       }
     };
 
@@ -64,21 +72,20 @@ export default function CategoriesPage() {
       description: description.trim(),
     };
 
-    const res = editingId
-      ? await fetch(`http://localhost:8080/api/categories/${editingId}`, {
+    try {
+      if (editingId) {
+        await apiRequestJson(`/api/categories/${editingId}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      : await fetch("http://localhost:8080/api/categories", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: payload,
         });
-
-    if (!res.ok) {
-      const msg = await res.text();
-      alert(msg);
+      } else {
+        await apiRequestJson("/api/categories", {
+          method: "POST",
+          body: payload,
+        });
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
       return;
     }
 
@@ -96,13 +103,12 @@ export default function CategoriesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("ลบหมวดหมู่นี้ใช่ไหม?")) return;
 
-    const res = await fetch(`http://localhost:8080/api/categories/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!res.ok) {
-      const msg = await res.text();
-      alert(msg);
+    try {
+      await apiRequestJson<void>(`/api/categories/${id}`, {
+        method: "DELETE",
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
       return;
     }
 
@@ -182,6 +188,13 @@ export default function CategoriesPage() {
             ) : null}
           </div>
         </div>
+
+        {loadError ? (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            โหลดหมวดหมู่สินค้าไม่สำเร็จ
+            <div className="mt-1 break-words text-xs text-amber-700">{loadError}</div>
+          </div>
+        ) : null}
 
         {showForm ? (
           <div className="mt-5 rounded-[24px] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-5">
