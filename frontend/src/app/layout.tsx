@@ -2,16 +2,18 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import "./globals.css"; 
+import "./globals.css";
+
+// หมายเหตุ: หากคุณมีฟอนต์ Geist ให้ Import กลับมาด้วยนะครับ 
+// เช่น: import { geistSans, geistMono } from "./fonts";
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname(); 
+  const pathname = usePathname();
 
-  // 🗑️ ลบ "จัดการหมวดหมู่โปรโมชั่น" ออกไปแล้วครับ
   const menuItems = [
     { path: "/orders", label: "จัดการออเดอร์", icon: "📝" },
     { path: "/promotions", label: "จัดการโปรโมชั่น", icon: "🏷️" },
@@ -22,17 +24,8 @@ export default function RootLayout({
   ];
 
   return (
-	    <html
-	      lang="en"
-	      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-	    >
-	      <body className="min-h-full flex flex-col">{children}</body>
-	    </html>
-	  );
-	}
-
-    <html lang="th">
-      <body>
+    <html lang="th" className="h-full antialiased">
+      <body className="min-h-full">
         <div className="flex h-screen w-full bg-[#f4f6f8] font-sans overflow-hidden">
           
           {/* Sidebar */}

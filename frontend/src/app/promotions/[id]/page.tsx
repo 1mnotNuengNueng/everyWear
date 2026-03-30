@@ -132,41 +132,54 @@ export default async function PromotionDetailPage({
         </div>
 
         {/* 3. รายการคูปองภายใต้โปรโมชั่นนี้ */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-lg font-bold text-gray-800">
-              🎟️ คูปองที่เกี่ยวข้อง ({coupons.length})
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">คูปองทั้งหมดที่ถูกสร้างขึ้นภายใต้โปรโมชั่นนี้</p>
-          </div>
-          
-          {coupons.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 text-sm">
-              <span className="text-3xl block mb-2">🎫</span>
-              ยังไม่มีการสร้างคูปองสำหรับโปรโมชั่นนี้
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-600">
-                <thead className="bg-gray-100 text-gray-500 uppercase font-bold text-xs">
-                  <tr>
-                    <th className="px-6 py-3">รหัสคูปอง (Code)</th>
-                    <th className="px-6 py-3 text-right">ส่วนลด</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {coupons.map((coupon) => (
-                    <tr key={coupon.id} className="hover:bg-blue-50 transition">
-                      <td className="px-6 py-4 font-bold text-gray-800">{coupon.code}</td>
-                      {/* เพิ่มเครื่องหมาย % หลังเลขส่วนลดในตารางคูปอง */}
-                      <td className="px-6 py-4 text-right font-black text-blue-600">{coupon.discountValue}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <div className="p-6 border-b border-gray-100 bg-gray-50">
+    <h2 className="text-lg font-bold text-gray-800">
+      🎟️ คูปองที่เกี่ยวข้อง ({coupons.length})
+    </h2>
+    <p className="text-sm text-gray-500 mt-1">รายการคูปองและวันหมดอายุภายใต้โปรโมชั่นนี้</p>
+  </div>
+  
+  {coupons.length === 0 ? (
+    <div className="p-8 text-center text-gray-400 text-sm">
+      <span className="text-3xl block mb-2">🎫</span>
+      ยังไม่มีการสร้างคูปองสำหรับโปรโมชั่นนี้
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm text-gray-600">
+        <thead className="bg-gray-100 text-gray-500 uppercase font-bold text-xs">
+          <tr>
+            <th className="px-6 py-3">รหัสคูปอง (Code)</th>
+            <th className="px-6 py-3 text-center">ส่วนลด</th>
+            <th className="px-6 py-3 text-right">วันหมดอายุ</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {coupons.map((coupon) => (
+            <tr key={coupon.id} className="hover:bg-blue-50 transition">
+
+              {/* 2. แสดง Code */}
+              <td className="px-6 py-4 font-bold text-gray-800">
+                <span className="bg-gray-100 px-2 py-1 rounded font-mono">{coupon.code}</span>
+              </td>
+              
+              {/* 3. แสดงส่วนลด */}
+              <td className="px-6 py-4 text-center font-black text-blue-600">
+                {coupon.discountValue}%
+              </td>
+
+              {/* 4. แสดงวันหมดอายุ */}
+              <td className="px-6 py-4 text-right font-medium text-gray-700">
+                {formatDateTime(coupon.expireDate)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
 
       </div>
     </div>
