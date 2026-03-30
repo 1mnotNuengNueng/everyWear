@@ -27,6 +27,13 @@ public class CategoryController {
         return categoryDAO.findAll();
     }
 
+    @GetMapping("/{id}")
+public ResponseEntity<?> getCategoryById(@PathVariable Integer id) {
+    return categoryDAO.findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+}
+
     @PostMapping
     public ResponseEntity<?> createCategory(@RequestBody Category category) {
 
