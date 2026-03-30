@@ -28,7 +28,7 @@ export default async function NewOrderPage() {
               สร้างออเดอร์
             </h1>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              เพิ่มรายการสินค้า และเลือก/กรอกคูปองได้
+              เพิ่มรายการสินค้า กรอกคูปองได้
             </p>
           </div>
           <Link
