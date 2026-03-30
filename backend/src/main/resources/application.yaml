@@ -2,7 +2,7 @@ server:
   port: ${PORT:8080} # 👈 ให้ Railway กำหนด Port ให้ ถ้าไม่มี (รันในเครื่อง) จะใช้ 8080
 
 spring:
-  application:
+  application:    
     name: everyWear
   datasource:
     url: jdbc:mysql://everywear-database-pollux11011.g.aivencloud.com:28617/defaultdb?sslMode=REQUIRED
