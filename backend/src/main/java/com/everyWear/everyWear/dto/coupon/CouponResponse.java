@@ -15,6 +15,8 @@ public class CouponResponse {
 	private String promotionName;
 	private BigDecimal discountValue;
 	private List<Integer> allowedCategoryIds;
+	private List<CouponCategorySummary> allowedCategories;
+	private List<Integer> usedOrderIds;
 
 	public Integer getId() {
 		return id;
@@ -86,5 +88,21 @@ public class CouponResponse {
 
 	public void setAllowedCategoryIds(List<Integer> allowedCategoryIds) {
 		this.allowedCategoryIds = allowedCategoryIds;
+	}
+
+	public List<CouponCategorySummary> getAllowedCategories() {
+		return allowedCategories;
+	}
+
+	public void setAllowedCategories(List<CouponCategorySummary> allowedCategories) {
+		this.allowedCategories = allowedCategories;
+	}
+
+	public List<Integer> getUsedOrderIds() {
+		return usedOrderIds;
+	}
+
+	public void setUsedOrderIds(List<Integer> usedOrderIds) {
+		this.usedOrderIds = usedOrderIds;
 	}
 }

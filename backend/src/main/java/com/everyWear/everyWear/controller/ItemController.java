@@ -45,6 +45,26 @@ public class ItemController {
         return ResponseEntity.ok(items);
     }
 
+    @GetMapping("/{id}")
+public ResponseEntity<?> getItemById(@PathVariable Integer id) {
+    return itemDAO.findById(id)
+            .filter(Item::isIsActive) // กัน soft delete
+            .map(item -> {
+                ItemSummaryResponse res = new ItemSummaryResponse();
+                res.setId(item.getId());
+                res.setName(item.getName());
+                res.setPrice(item.getPrice());
+
+                if (item.getCategory() != null) {
+                    res.setCategoryId(item.getCategory().getId());
+                    res.setCategoryName(item.getCategory().getName());
+                }
+
+                return ResponseEntity.ok(res);
+            })
+            .orElse(ResponseEntity.notFound().build());
+}
+
     @PostMapping
     public ResponseEntity<?> createItem(@RequestBody Item item) {
 

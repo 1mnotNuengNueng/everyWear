@@ -10,6 +10,12 @@ type PromotionOption = {
   startAt: string | null;
   endAt: string | null;
   categoryIds?: number[] | null;
+  categories?: Array<{ id: number; name: string }> | null;
+};
+
+type CategoryOption = {
+  id: number;
+  name: string;
 };
 
 type InitialCoupon = {
@@ -37,10 +43,7 @@ function formatMoney(value: string | number | null) {
   if (value === null || value === undefined) return "-";
   const numberValue = typeof value === "string" ? Number(value) : value;
   if (Number.isNaN(numberValue)) return String(value);
-  return new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-  }).format(numberValue);
+  return `${numberValue}%`;
 }
 
 function formatDateTime(value: string | null) {
@@ -57,30 +60,52 @@ function formatDateTime(value: string | null) {
 export default function CouponUpsertForm(props: {
   mode: "create" | "edit";
   promotions: PromotionOption[];
+  categories: CategoryOption[];
   initial?: InitialCoupon;
   action: (formData: FormData) => void | Promise<void>;
 }) {
+  const defaultIsActive = props.initial?.isActive ?? true;
   const [promotionId, setPromotionId] = useState<number | "">(
     props.initial?.promotionId ?? "",
   );
   const [expireDate, setExpireDate] = useState<string>(
     toDateTimeLocalValue(props.initial?.expireDate ?? null),
   );
-  const [isActive, setIsActive] = useState<boolean>(props.initial?.isActive ?? true);
 
   const selectedPromotion = useMemo(() => {
     if (promotionId === "") return null;
     return props.promotions.find((promotion) => promotion.id === promotionId) ?? null;
   }, [promotionId, props.promotions]);
 
+  const selectedCategoryNames = useMemo(() => {
+    if (selectedPromotion?.categories && selectedPromotion.categories.length > 0) {
+      return selectedPromotion.categories
+        .map((category) => category.name)
+        .filter((name, index, array) => Boolean(name) && array.indexOf(name) === index);
+    }
+
+    if (!selectedPromotion?.categoryIds || selectedPromotion.categoryIds.length === 0) {
+      return [];
+    }
+
+    const categoryMap = new Map(
+      props.categories.map((category) => [category.id, category.name]),
+    );
+
+    return selectedPromotion.categoryIds
+      .map((categoryId) => categoryMap.get(categoryId))
+      .filter((name): name is string => Boolean(name))
+      .filter((name, index, array) => array.indexOf(name) === index);
+  }, [props.categories, selectedPromotion]);
+
   const payloadJson = useMemo(
     () =>
       JSON.stringify({
         promotionId: promotionId === "" ? null : promotionId,
         expireDate: expireDate === "" ? null : expireDate,
-        isActive,
+        isActive: defaultIsActive,
       }),
-    [expireDate, isActive, promotionId],
+    [defaultIsActive, expireDate, promotionId],
   );
 
   const isValid = promotionId !== "" && expireDate !== "";
@@ -129,15 +154,10 @@ export default function CouponUpsertForm(props: {
             />
           </label>
 
-          <label className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(event) => setIsActive(event.target.checked)}
-              className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
-            />
-            <span className="font-medium text-stone-900">เปิดใช้งานคูปองทันที</span>
-          </label>
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+            สถานะการใช้งานของคูปองถูกกำหนดโดยระบบ
+            {defaultIsActive ? " และเริ่มต้นเป็นยังไม่ถูกใช้" : " และรายการนี้ถูกใช้แล้ว"}
+          </div>
 
           <button
             type="submit"
@@ -178,13 +198,13 @@ export default function CouponUpsertForm(props: {
               <div>
                 <div className="text-stone-400">หมวดหมู่ที่ร่วมรายการ</div>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedPromotion.categoryIds && selectedPromotion.categoryIds.length > 0 ? (
-                    selectedPromotion.categoryIds.map((categoryId) => (
+                  {selectedCategoryNames.length > 0 ? (
+                    selectedCategoryNames.map((categoryName) => (
                       <span
-                        key={categoryId}
+                        key={categoryName}
                         className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium"
                       >
-                        Category #{categoryId}
+                        {categoryName}
                       </span>
                     ))
                   ) : (

@@ -15,10 +15,19 @@ type PromotionOption = {
   startAt: string | null;
   endAt: string | null;
   categoryIds?: number[] | null;
+  categories?: Array<{ id: number; name: string }> | null;
+};
+
+type CategoryOption = {
+  id: number;
+  name: string;
 };
 
 export default async function NewCouponPage() {
-  const promotions = await apiGetJson<PromotionOption[]>("/api/promotions");
+  const [promotions, categories] = await Promise.all([
+    apiGetJson<PromotionOption[]>("/api/promotions"),
+    apiGetJson<CategoryOption[]>("/api/categories").catch(() => []),
+  ]);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_100%)]">
@@ -43,6 +52,7 @@ export default async function NewCouponPage() {
         <CouponUpsertForm
           mode="create"
           promotions={promotions}
+          categories={categories}
           action={createCouponAction}
         />
       </main>
