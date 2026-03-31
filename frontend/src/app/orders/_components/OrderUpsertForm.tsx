@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type ItemOption = {
@@ -53,6 +54,16 @@ type StockApiResponse = {
   itemName: string | null;
   quantity: number | null;
   updatedAt: string | null;
+};
+
+type RewardCouponResponse = {
+  id: number;
+  code: string;
+  discountPercent: number;
+  maxDiscountAmount: number;
+  status: string;
+  createdAt: string | null;
+  usedAt: string | null;
 };
 
 type OrderLine = {
@@ -114,13 +125,43 @@ async function localGetJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function localJsonRequest<TResponse>(
+  path: string,
+  init: Omit<RequestInit, "body"> & { body?: unknown },
+): Promise<TResponse> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Request failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`,
+    );
+  }
+
+  return (await response.json()) as TResponse;
+}
+
 export default function OrderUpsertForm(props: {
   mode: "create" | "edit";
   items: ItemOption[];
   initial?: InitialOrder;
   action: (formData: FormData) => void | Promise<void>;
 }) {
+  const router = useRouter();
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+  const [rewardCoupon, setRewardCoupon] = useState<RewardCouponResponse | null>(
+    null,
+  );
   const [couponCode, setCouponCode] = useState<string>(
     props.initial?.couponCode ?? "",
   );
@@ -515,11 +556,52 @@ export default function OrderUpsertForm(props: {
     })();
   }, [normalizedCouponCode, props.mode]);
 
+  async function handleCreateSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!isValid) {
+      setSubmitMessage("กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนบันทึก");
+      return;
+    }
+
+    setSubmitMessage(null);
+    setIsSubmittingOrder(true);
+
+    try {
+      const payload = JSON.parse(payloadJson) as unknown;
+      const response = await localJsonRequest<{
+        order: { id: number };
+        rewardCoupon: RewardCouponResponse | null;
+      }>("/api/orders/checkout", {
+        method: "POST",
+        body: payload,
+      });
+
+      setCreatedOrderId(response.order.id);
+
+      if (response.rewardCoupon) {
+        setRewardCoupon(response.rewardCoupon);
+      } else {
+        router.push(`/orders/${response.order.id}`);
+      }
+    } catch (error) {
+      setSubmitMessage(
+        error instanceof Error ? error.message : "ไม่สามารถสร้างออเดอร์ได้",
+      );
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  }
+
   return (
     <form
-      action={props.action}
+      action={props.mode === "edit" ? props.action : undefined}
       onSubmit={(event) => {
-        if (validationMessage) {
+        if (props.mode === "create") {
+          void handleCreateSubmit(event);
+          return;
+        }
+        if (!isValid) {
           event.preventDefault();
           setSubmitMessage(validationMessage);
           return;
@@ -826,11 +908,47 @@ export default function OrderUpsertForm(props: {
       {/* ปุ่ม Submit */}
       <button
         type="submit"
-        disabled={!isValid}
+        disabled={!isValid || isSubmittingOrder}
         className="h-12 mt-4 rounded shadow bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
       >
         {props.mode === "create" ? "✔️ ยืนยันสร้างออเดอร์" : "💾 บันทึกการแก้ไข"}
       </button>
+      {rewardCoupon && createdOrderId !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 px-4">
+          <div className="w-full max-w-md rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl">
+            <div className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+              Reward Coupon
+            </div>
+            <h3 className="mt-4 text-2xl font-semibold text-stone-900">
+              ได้รับคูปองสำหรับร้านสหกรณ์
+            </h3>
+            <div className="mt-5 grid gap-3 rounded-2xl bg-stone-50 p-4 text-sm text-stone-700">
+              <div>รหัสคูปอง : {rewardCoupon.code}</div>
+              <div>ลดราคา % : {rewardCoupon.discountPercent}</div>
+              <div>ลดได้สูงสุด : {rewardCoupon.maxDiscountAmount}</div>
+            </div>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => router.push(`/orders/${createdOrderId}`)}
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl bg-stone-900 px-4 text-sm font-semibold text-white transition hover:bg-stone-800"
+              >
+                ไปที่รายละเอียดออเดอร์
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRewardCoupon(null);
+                  router.push(`/orders/${createdOrderId}`);
+                }}
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-stone-200 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }
